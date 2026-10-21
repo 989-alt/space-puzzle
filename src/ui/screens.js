@@ -1,5 +1,5 @@
 // 화면 전환(시작·안내·게임·정답)과 세로 화면 안내. 그리기와 콜백만 둔다(게임 규칙·저장 금지).
-import { ISLAND_NAMES } from './hud.js';
+import { ISLAND_NAMES, fmtMult } from './hud.js';
 
 const $ = (sel) => document.querySelector(sel);
 const SCREENS = ['title', 'tutorial', 'game', 'win'];
@@ -83,6 +83,13 @@ export function openTutorial({ inputKind = detectInputKind(), mode = 'start' } =
   const done = $('#tutDone');
   if (done) done.lastChild.textContent = mode === 'help' ? '알겠어요, 계속!' : '알겠어요, 시작!';
   showScreen('tutorial');
+  done?.focus({ preventScroll: true });
+}
+
+function finishTutorial() {
+  const dontShowAgain = $('#dontShow')?.checked === true;
+  const mode = tutorialReturn === 'game' ? 'help' : 'start';
+  handlers.tutorialDone.forEach((cb) => cb({ dontShowAgain, mode }));
 }
 
 export function onStart(cb) { handlers.start.push(cb); }
@@ -113,8 +120,6 @@ function islandImg(stage) {
   img.alt = ISLAND_NAMES[stage] ?? '';
   return img;
 }
-
-const fmtMult = (m) => `×${Number.isInteger(m) ? m : m.toFixed(1)}`;
 
 export function showWin({ gained = 0, base = 100, speed = 0, streak = 0, mult = 1, usedEasy = false,
   islandBefore = 0, islandAfter = 0, nextHint = '' } = {}) {
@@ -182,10 +187,10 @@ export function initScreens() {
   document.querySelectorAll('#screen-tutorial .seg button').forEach((b) => {
     b.addEventListener('click', () => setTutorialKind(b.dataset.kind));
   });
-  $('#tutDone')?.addEventListener('click', () => {
-    const dontShowAgain = $('#dontShow')?.checked === true;
-    const mode = tutorialReturn === 'game' ? 'help' : 'start';
-    handlers.tutorialDone.forEach((cb) => cb({ dontShowAgain, mode }));
+  $('#tutDone')?.addEventListener('click', finishTutorial);
+  // 도움말로 연 안내는 Esc로 닫고 게임으로 돌아간다.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && current === 'tutorial' && tutorialReturn === 'game') finishTutorial();
   });
   $('#nextBtn')?.addEventListener('click', () => handlers.next.forEach((cb) => cb()));
   watchPortrait();

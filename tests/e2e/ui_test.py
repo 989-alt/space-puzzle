@@ -80,9 +80,15 @@ def title_to_tutorial_first_visit(browser, base):
     page.click("[data-tool=help]")
     page.wait_for_timeout(200)
     help_tut = visible(page, "#screen-tutorial")
+    focused = page.evaluate("() => document.activeElement?.id")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(350)
+    esc_closed = not visible(page, "#screen-tutorial") and visible(page, "#screen-game")
     check("title_to_tutorial_first_visit",
           first and checked and in_game and not second_tut and second_game and help_tut,
           f"first={first} game={in_game} second_tut={second_tut} second_game={second_game} help={help_tut}")
+    check("tutorial_focus_and_escape", focused == "tutDone" and esc_closed,
+          f"focused={focused} esc_closed={esc_closed}")
     ctx.close()
 
 
@@ -154,6 +160,15 @@ def clue_card_no_overflow(browser, base):
     page.evaluate("() => { window.__ckUi.setEasyAvailable(true); window.__ckUi.showBubble('모양이 조금 달라요'); }")
     page.wait_for_timeout(400)
     shot(page, "game-bubble-easy")
+    # 쉬운 단서로 바뀐 카드: 단계 표시는 작은 알약 그대로(버튼 모양 규칙이 붙지 않음)
+    page.evaluate("() => window.__ckUi.showPuzzle('s4-001', 3, {easy: true})")
+    page.wait_for_timeout(450)
+    pill = page.evaluate("""() => { const l = document.querySelector('#clueLevel'); const r = l.getBoundingClientRect();
+        const c = document.querySelector('#clueCard').getBoundingClientRect(); const s = getComputedStyle(l);
+        return { h: r.height, w: r.width, cw: c.width, cls: l.className, minH: s.minHeight, text: l.textContent }; }""")
+    shot(page, "game-easy-clue")
+    check("easy_clue_pill", pill["h"] < 30 and pill["w"] < pill["cw"] and "is-easy" in pill["cls"]
+          and pill["minH"] in ("auto", "0px") and pill["text"].startswith("쉬운 단서"), f"{pill}")
     ctx.close()
 
 
@@ -221,9 +236,9 @@ def win_shot(browser, base):
     page.wait_for_timeout(300)
     shot(page, "win-reduced")
     conf_off = page.evaluate("() => document.querySelectorAll('#conf .conf').length")
-    anim = page.evaluate("() => getComputedStyle(document.querySelector('.rays')).animationName")
-    check("win_reduced_motion", conf_on > 0 and conf_off == 0 and anim == "none",
-          f"conf_on={conf_on} conf_off={conf_off} rays_anim={anim}")
+    rays_visible = visible(page, ".rays")
+    check("win_reduced_motion", conf_on > 0 and conf_off == 0 and not rays_visible,
+          f"conf_on={conf_on} conf_off={conf_off} rays_visible={rays_visible}")
     ctx.close()
 
 

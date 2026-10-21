@@ -1,12 +1,15 @@
 // 게임 화면 HUD: 단계·연속 칩, 점수, 섬 배지, 도구 버튼, 말풍선. 그리기와 콜백만 둔다.
+import { toNextIsland } from '../core/progress.js';
+
 const $ = (sel) => document.querySelector(sel);
 
 export const LEVEL_NAMES = ['', '1단계 · 3D 모양', '2단계 · 위에서 본 모양', '3단계 · 층별 단서', '4단계 · 위·앞·옆'];
 export const ISLAND_NAMES = ['빈 섬', '블록 오두막', '블록 마을', '블록 성'];
-const PER_ISLAND = 5;
+// 섬 한 단계에 필요한 문제 수는 progress.js 규칙에서 가져온다(처음 섬에서 다음 단계까지 남은 수).
+const PER_ISLAND = toNextIsland(0);
 
 export const levelName = (level) => LEVEL_NAMES[level] ?? '';
-const fmtMult = (m) => `×${Number.isInteger(m) ? m : m.toFixed(1)}`;
+export const fmtMult = (m) => `×${Number.isInteger(m) ? m : m.toFixed(1)}`;
 
 const tools = new Map();
 let bubbleTimer = 0;

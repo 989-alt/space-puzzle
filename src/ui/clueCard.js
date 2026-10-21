@@ -78,7 +78,7 @@ export function renderClue(card, clue, { easy = false } = {}) {
   const lvl = card.querySelector('.lvl');
   if (lvl) {
     lvl.textContent = easy ? `쉬운 단서 · ${SHORT[clue.level]}` : SHORT[clue.level];
-    lvl.classList.toggle('easy', easy);
+    lvl.classList.toggle('is-easy', easy);
   }
   const body = card.querySelector('.clue-body') ?? card;
   const parts = clue.level === 1 ? level1()

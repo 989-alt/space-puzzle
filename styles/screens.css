@@ -78,7 +78,7 @@
 .clue h3{margin:0;font-family:var(--font-title);font-weight:400;font-size:1.6cqw;text-align:center;color:var(--purple)}
 .clue .lvl{margin:.2cqw auto .8cqw;width:max-content;max-width:100%;font-size:max(11px,1cqw);font-weight:800;color:#fff;
   background:linear-gradient(180deg,var(--purple-2),var(--purple));border-radius:999px;padding:.25cqw 1cqw;white-space:nowrap}
-.clue .lvl.easy{background:linear-gradient(180deg,#FF8A3D,#E8430F)}
+.clue .lvl.is-easy{background:linear-gradient(180deg,#FF8A3D,#E8430F)}
 .g{display:grid;gap:var(--gap,.3cqw);justify-content:center}
 .g div{width:var(--cs,2.3cqw);height:var(--cs,2.3cqw);border-radius:.4cqw;background:#E9DFC9;display:flex;align-items:center;justify-content:center;
   font-family:var(--font-title);font-size:calc(var(--cs,2.3cqw) * .62);color:#7A3B00}
@@ -93,11 +93,11 @@
 .views>div{text-align:center}
 .views .g{justify-content:start}
 .views .cap{margin:.2cqw 0 0}
-.easy{display:flex;width:100%;margin-top:.8cqw;min-height:48px;align-items:center;justify-content:center;gap:.5cqw;font-family:var(--font-title);
+button.easy{display:flex;width:100%;margin-top:.8cqw;min-height:48px;align-items:center;justify-content:center;gap:.5cqw;font-family:var(--font-title);
   font-size:1.15cqw;line-height:1.2;color:#5A2C00;border:.25cqw solid #FFF4B8;border-radius:1cqw;cursor:pointer;padding:.4cqw .6cqw;
   background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 50%,var(--gold-3));box-shadow:0 .4cqw 0 var(--gold-edge);animation:pop .35s cubic-bezier(.3,1.6,.5,1)}
-.easy svg{width:1.4cqw;height:1.4cqw;flex:none}
-.easy[hidden]{display:none}
+button.easy svg{width:1.4cqw;height:1.4cqw;flex:none}
+button.easy[hidden]{display:none}
 @keyframes pop{from{scale:.6;opacity:0}}
 
 .tools{position:absolute;right:2%;bottom:3%;display:flex;gap:.8cqw;z-index:2}
@@ -160,8 +160,8 @@
 @keyframes tilt{0%,25%{rotate:0deg}55%,80%{rotate:-90deg}}
 
 @media (prefers-reduced-motion:reduce){
-  .rays{animation:none}
+  .rays{animation:none;display:none}
   #conf{display:none}
-  .t-cubi,.screen.on .win-logo,.screen.on .win-cubi,#rotateHint svg,.easy{animation:none}
+  .t-cubi,.screen.on .win-logo,.screen.on .win-cubi,#rotateHint svg,button.easy{animation:none}
   .screen,.screen.on,.bubble{transition:none}
 }
