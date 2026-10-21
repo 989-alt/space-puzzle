@@ -20,7 +20,7 @@ import {
   initScreens, showScreen, currentScreen, openTutorial, onStart, onTutorialDone, onNext,
   showWin, setTitleStats, detectInputKind, showWebGLError,
 } from './ui/screens.js';
-import { renderHud, showBubble, setEasyAvailable, onTool, levelName } from './ui/hud.js';
+import { renderHud, showBubble, hideBubble, setEasyAvailable, onTool, levelName } from './ui/hud.js';
 import { renderClue } from './ui/clueCard.js';
 
 const COLORS = ['#3B9BFF', '#3DD47A', '#FF8A2B', '#A86BFF', '#FFD23F'];
@@ -34,7 +34,15 @@ const $ = (sel) => document.querySelector(sel);
 const banks = new Map();
 function bank(stage) {
   if (!banks.has(stage)) {
-    const p = fetch(`data/puzzles-s${stage}.json`).then((r) => r.json());
+    const p = fetch(`data/puzzles-s${stage}.json`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`문제 은행 ${stage}단계를 받지 못함(${r.status})`);
+        return r.json();
+      })
+      .then((list) => {
+        if (!Array.isArray(list) || list.length === 0) throw new Error(`문제 은행 ${stage}단계가 비어 있음`);
+        return list;
+      });
     p.catch(() => banks.delete(stage)); // 실패하면 다음에 다시 받는다
     banks.set(stage, p);
   }
@@ -69,12 +77,23 @@ let usedEasy = false;
 let attemptNo = 0;
 let attemptId = '';
 let startAt = 0; // performance.now() 기준 문제 시작 시각
+let pausedAt = null; // 도움말이 열린 시각(열려 있는 동안 경과 시간을 멈춘다)
+let loadFailed = false; // 문제 은행을 받지 못해 새 문제를 못 냈다
 let solved = false;
 let started = false; // 게임에 한 번이라도 들어갔는지
 let shakes = 0; // 확인용: 흔들기 횟수
 let loading = Promise.resolve();
 
-const elapsedSec = () => (performance.now() - startAt) / 1000;
+const nowOrPaused = () => pausedAt ?? performance.now();
+const elapsedSec = () => (nowOrPaused() - startAt) / 1000;
+function pauseTimer() {
+  if (pausedAt === null) pausedAt = performance.now();
+}
+function resumeTimer() {
+  if (pausedAt === null) return;
+  startAt += performance.now() - pausedAt;
+  pausedAt = null;
+}
 
 function hud() {
   renderHud({
@@ -113,7 +132,7 @@ if (renderer) {
   input = attachInput({
     canvas, stage, world,
     getPieces: () => pieces,
-    setPiece: (i, p) => { pieces[i] = { ...p, color: pieces[i].color }; },
+    setPiece: (i, p) => { if (pieces[i]) pieces[i] = { ...p, color: pieces[i].color }; },
     onDrop: () => check(),
     onRotate: () => check(),
   });
@@ -146,15 +165,19 @@ function showClue() {
 }
 
 function begin(p) {
+  const nextPieces = startPieces(p); // 배치가 안 되면 여기서 던지고 지금 문제는 그대로 둔다
+  input?.cancel(); // 끌던 조각·열린 링을 버린다
   puzzle = { id: p.id, target: p.target, pieces: p.pieces };
-  pieces = startPieces(puzzle);
+  pieces = nextPieces;
   level = progress.stage;
   usedEasy = false;
   solved = false;
   attemptNo += 1;
   attemptId = `${puzzle.id}#${attemptNo}`;
-  startAt = performance.now();
+  startAt = nowOrPaused();
   remember(puzzle.id);
+  hideBubble();
+  world?.stopShake();
   if (world) {
     world.setPuzzle(puzzle.target);
     world.setPieces(pieces);
@@ -166,20 +189,35 @@ function begin(p) {
 }
 
 // 현재 단계 은행에서 새 문제. 시작 배치가 안 되는 문제는 건너뛴다.
+// 은행을 받지 못하면 "문제를 불러오지 못했어요" 카드를 띄운다(다시 불러오기·건너뛰기로 다시 시도).
 function nextPuzzle() {
   loading = (async () => {
-    for (let n = 0; n < 5; n++) {
-      const p = await pickPuzzle(progress.stage);
-      try {
-        begin(p);
-        return;
-      } catch (err) {
-        console.warn('문제를 시작할 수 없어 다른 문제를 고릅니다', p.id, err);
-        remember(p.id);
+    try {
+      for (let n = 0; n < 5; n++) {
+        const p = await pickPuzzle(progress.stage);
+        try {
+          begin(p);
+          setLoadFailed(false);
+          return;
+        } catch (err) {
+          console.warn('문제를 시작할 수 없어 다른 문제를 고릅니다', p.id, err);
+          remember(p.id);
+        }
       }
+      throw new Error('시작 배치가 되는 문제를 찾지 못함');
+    } catch (err) {
+      console.warn('문제를 불러오지 못했습니다', err);
+      setLoadFailed(true);
     }
   })();
   return loading;
+}
+
+function setLoadFailed(on) {
+  loadFailed = on;
+  const card = $('#loadFail');
+  if (card) card.hidden = !on;
+  if (on) setEasyAvailable(false);
 }
 
 // ---------- 판정·정답 ----------
@@ -220,7 +258,7 @@ function win() {
 
 // 1초마다 경과 시간을 보고 쉬운 단서 버튼을 띄운다.
 function tick() {
-  if (!puzzle || solved || usedEasy) return;
+  if (!puzzle || solved || usedEasy || loadFailed || pausedAt !== null) return;
   setEasyAvailable(canUseEasy(progress.stage, elapsedSec()));
 }
 setInterval(tick, 1000);
@@ -234,7 +272,11 @@ function useEasy() {
 }
 
 function skip() {
-  if (!puzzle) return;
+  // 문제를 못 불러온 상태면 연속 기록은 그대로 두고 다시 불러오기만 한다.
+  if (!puzzle || loadFailed) {
+    nextPuzzle();
+    return;
+  }
   progress = recordSkip(progress);
   persist();
   nextPuzzle();
@@ -242,6 +284,7 @@ function skip() {
 
 function restart() {
   if (!puzzle || solved) return;
+  input?.cancel();
   pieces = startPieces(puzzle);
   world?.setPieces(pieces);
 }
@@ -266,14 +309,22 @@ onStart(() => {
 onTutorialDone(({ dontShowAgain, mode }) => {
   if (dontShowAgain) save('tutorialSeen', true);
   // 도움말로 연 안내는 닫기만 한다(같은 문제·같은 배치로 돌아간다).
-  if (mode === 'help') showScreen('game');
-  else enterGame();
+  if (mode === 'help') {
+    resumeTimer();
+    showScreen('game');
+  } else enterGame();
 });
 onNext(() => {
+  if (currentScreen() !== 'win') return; // 두 번 눌러도 한 번만
   showScreen('game');
   nextPuzzle();
 });
-onTool('help', () => openTutorial({ inputKind: detectInputKind(), mode: 'help' }));
+onTool('help', () => {
+  input?.cancel();
+  pauseTimer(); // 도움말을 보는 동안 시간은 멈춘다
+  openTutorial({ inputKind: detectInputKind(), mode: 'help' });
+});
+onTool('retry', () => nextPuzzle());
 onTool('easy', useEasy);
 onTool('skip', skip);
 onTool('restart', restart);
@@ -304,6 +355,7 @@ if (E2E) {
       screen: currentScreen(), stage: progress.stage, streak: progress.streak, score: progress.score,
       solvedTotal: progress.solvedTotal, best: progress.best, level, usedEasy, solved,
       puzzleId: puzzle?.id ?? null, attemptId, elapsed: puzzle ? elapsedSec() : 0, shakes, webgl: !!renderer,
+      paused: pausedAt !== null, loadFailed,
     }),
     puzzle: () => (puzzle ? JSON.parse(JSON.stringify(puzzle)) : null),
     pieces: () => copy(pieces),
@@ -319,6 +371,13 @@ if (E2E) {
       return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
     },
     fits: (i) => fits(pieces[i].cells, pieces[i].pos[0], pieces[i].pos[2], boardCenter(footprint(puzzle.target))),
+    // 판 좌표 점의 화면(클라이언트) 좌표
+    project(x, y, z) {
+      if (!world) return null;
+      v.copy(world.toWorld(x, y, z)).project(camera);
+      const r = canvas.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    },
     spin: () => world?.getSpin() ?? 0,
     setSpin: (r) => world?.setSpin(r),
     ghostVisible: () => level === 1,
@@ -337,7 +396,7 @@ if (E2E) {
       return puzzle.id;
     },
     elapsed(sec) {
-      startAt = performance.now() - sec * 1000;
+      startAt = nowOrPaused() - sec * 1000;
       tick();
     },
     setProgress(patch) {

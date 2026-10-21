@@ -122,6 +122,7 @@ export function attachInput({
     if (!f) return;
     const pieces = getPieces();
     const p = pieces[drag.i];
+    if (!p) return; // 문제가 바뀌어 조각이 없어졌다
     const next = movePiece(p, Math.round(f.x - drag.off[0]), Math.round(f.z - drag.off[1]), pieces, world.center());
     setPiece(drag.i, next);
     world.updatePiece(drag.i, next, { lift: true });
@@ -132,6 +133,7 @@ export function attachInput({
     const i = drag.i;
     drag = null;
     const pieces = getPieces();
+    if (!pieces[i]) return; // 문제가 바뀌어 조각이 없어졌다
     const next = movePiece(pieces[i], pieces[i].pos[0], pieces[i].pos[2], pieces, world.center());
     setPiece(i, next);
     world.updatePiece(i, next, { lift: false });
@@ -286,6 +288,16 @@ export function attachInput({
       ptrs.clear();
       drag = null;
       spin = null;
+    },
+    // 진행 중인 끌기·길게 누르기·회전판·선택·링을 버린다(문제를 바꾸거나 다시 놓을 때). 리스너는 그대로 둔다.
+    // 남은 포인터의 이동·떼기 이벤트는 모르는 포인터로 보고 무시한다.
+    cancel() {
+      clearTimer();
+      ptrs.clear();
+      drag = null;
+      spin = null;
+      selected = null;
+      hideRing();
     },
     resetSpin() {
       world.setSpin(0);

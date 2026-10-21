@@ -114,6 +114,33 @@ test('starts are tidy: left, right, back (long side along x)', () => {
   assert.ok(w2 >= d2, 'back piece lies along x');
 });
 
+// R16a: 뒤(270도) 조각은 작업대 끝으로 간다. 같은 x 에서 한 줄 더 뒤(z − 1)로 옮기면
+// 작업대를 벗어나거나 판·다른 조각 둘레에 닿아야 한다(160문제 × 시드).
+test('back start piece sits at the farthest fitting row (all 160 puzzles x seeds)', () => {
+  const bad = [];
+  let checked = 0;
+  for (const p of bank) {
+    const angles = startAngles(p.pieces.length);
+    const bi = angles.indexOf(270);
+    if (bi < 0) continue;
+    const fp = footprint(p.target);
+    const center = boardCenter(fp);
+    const boardCols = [...fp.cells].map((k) => k.split(',').map(Number));
+    for (const seed of SEEDS) {
+      const st = placeStarts(p.pieces, fp, mulberry32(seed));
+      const b = st[bi];
+      const others = st.filter((_, j) => j !== bi).flatMap((s) => colsOf(s.cells, s.x, s.z));
+      const z = b.z - 1;
+      const clear = fits(b.cells, b.x, z, center)
+        && colsOf(b.cells, b.x, z).every((c) => !boardCols.some((q) => near(c, q)) && !others.some((q) => near(c, q)));
+      if (clear) bad.push(`${p.id}#${seed}`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 200, `checked ${checked}`);
+  assert.deepEqual(bad, []);
+});
+
 test('starts are deterministic for a seed', () => {
   const p = bank.find((e) => e.id === 's3-005');
   const fp = footprint(p.target);

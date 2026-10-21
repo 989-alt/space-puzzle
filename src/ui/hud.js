@@ -40,6 +40,11 @@ export function showBubble(text, ms = 2500) {
   bubbleTimer = setTimeout(() => b.classList.remove('on'), ms);
 }
 
+export function hideBubble() {
+  clearTimeout(bubbleTimer);
+  $('#bubble').classList.remove('on');
+}
+
 export function setEasyAvailable(on) {
   $('#easyBtn').hidden = !on;
 }

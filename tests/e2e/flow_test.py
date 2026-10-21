@@ -65,10 +65,12 @@ def visible(page, sel):
     return page.locator(sel).first.is_visible()
 
 
-def open_game(browser, base, launch_errors=None):
+def open_game(browser, base, launch_errors=None, ctx_opts=None, setup=None, wait_puzzle=True):
     """튜토리얼을 본 것으로 두고 시작 버튼을 눌러 첫 문제까지 연다."""
-    ctx = browser.new_context(viewport=VIEW)
+    ctx = browser.new_context(viewport=VIEW, **(ctx_opts or {}))
     page = ctx.new_page()
+    if setup:
+        setup(page)
     errors = [] if launch_errors is None else launch_errors
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(f"{base}/index.html?e2e")
@@ -77,7 +79,8 @@ def open_game(browser, base, launch_errors=None):
     page.wait_for_function("() => window.__ckReady === true && window.__ck", timeout=15000)
     page.evaluate("document.fonts.ready")
     page.click("#startBtn")
-    page.wait_for_function("() => __ck.state().screen === 'game' && __ck.state().puzzleId", timeout=15000)
+    if wait_puzzle:
+        page.wait_for_function("() => __ck.state().screen === 'game' && __ck.state().puzzleId", timeout=15000)
     page.wait_for_timeout(300)
     return ctx, page, errors
 
@@ -96,16 +99,19 @@ def solve_shows_win_and_scores(browser, base):
     s1 = state(page)
     gain = page.inner_text("#winGain")
     shot(page, "win")
-    page.click("#nextBtn")
+    # 다음 문제를 두 번 눌러도 문제는 한 번만 바뀐다.
+    page.evaluate("() => { const b = document.querySelector('#nextBtn'); b.click(); b.click(); }")
     page.wait_for_function("() => __ck.state().screen === 'game'", timeout=5000)
     page.wait_for_timeout(400)
     s2 = state(page)
+    attempts = (int(s1["attemptId"].split("#")[1]), int(s2["attemptId"].split("#")[1]))
     island2 = page.inner_text("#islandNext")
     shot(page, "next")
     check("solve_shows_win_and_scores",
           win and s1["score"] > 0 and gain.startswith("+") and s2["puzzleId"] != s0["puzzleId"]
-          and island0.endswith("5문제") and island2.endswith("4문제") and s2["solvedTotal"] == 1 and not errors,
-          f"win={win} score={s1['score']} gain={gain} ids={s0['puzzleId']}->{s2['puzzleId']} "
+          and island0.endswith("5문제") and island2.endswith("4문제") and s2["solvedTotal"] == 1
+          and attempts[1] == attempts[0] + 1 and not errors,
+          f"win={win} score={s1['score']} gain={gain} ids={s0['puzzleId']}->{s2['puzzleId']} attempts={attempts} "
           f"island={island0!r}->{island2!r} errors={errors[:2]}")
     ctx.close()
 
@@ -142,11 +148,15 @@ def all_on_board_wrong_shakes(browser, base):
     text = page.inner_text("#bubbleText")
     after = state(page)
     shot(page, "mismatch")
+    page.click("[data-tool=skip]")
+    page.wait_for_function("() => __ck.state().puzzleId !== 'alt-proto'", timeout=5000)
+    bubble_after_skip = page.evaluate("() => document.querySelector('#bubble').classList.contains('on')")
     check("all_on_board_wrong_shakes",
           bubble_on and text == "모양이 조금 달라요" and after["score"] == before["score"]
           and after["screen"] == "game" and after["streak"] == before["streak"] and after["shakes"] == before["shakes"] + 1
-          and not errors,
-          f"bubble={bubble_on} text={text!r} score={before['score']}->{after['score']} shakes={after['shakes']} errors={errors[:2]}")
+          and not bubble_after_skip and not errors,
+          f"bubble={bubble_on} text={text!r} score={before['score']}->{after['score']} shakes={after['shakes']} "
+          f"bubble_after_skip={bubble_after_skip} errors={errors[:2]}")
     ctx.close()
 
 
@@ -221,11 +231,84 @@ def help_keeps_puzzle(browser, base):
     page.click("[data-tool=help]")
     page.wait_for_timeout(300)
     tut = visible(page, "#screen-tutorial")
+    # 도움말이 열린 동안 경과 시간이 멈춘다(R16b).
+    e0 = state(page)
+    page.wait_for_timeout(1500)
+    e1 = state(page)
     page.click("#tutDone")
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(1000)
+    e2 = state(page)
     after = page.evaluate("JSON.stringify({id: __ck.state().attemptId, p: __ck.pieces().map(p => [p.cells, p.pos])})")
+    paused_ok = e0["paused"] and e1["paused"] and abs(e1["elapsed"] - e0["elapsed"]) < 0.01
+    resumed_ok = not e2["paused"] and 0.7 < e2["elapsed"] - e1["elapsed"] < 2.0
     check("help_keeps_puzzle", tut and before == after and visible(page, "#screen-game") and not errors,
           f"tut={tut} same={before == after} errors={errors[:2]}")
+    check("help_pauses_timer", paused_ok and resumed_ok,
+          f"elapsed {e0['elapsed']:.2f} -> {e1['elapsed']:.2f} (paused) -> {e2['elapsed']:.2f}")
+    ctx.close()
+
+
+def drag_then_skip_is_safe(browser, base):
+    """터치로 조각을 끄는 중에 건너뛰기 → 남은 이동·떼기가 새 문제를 망가뜨리지 않는다."""
+    ctx, page, errors = open_game(browser, base, ctx_opts={"has_touch": True})
+    cdp = ctx.new_cdp_session(page)
+    s0 = state(page)
+    x, y = page.evaluate("[__ck.pieceScreenXY(0).x, __ck.pieceScreenXY(0).y]")
+
+    def touch(kind, pts):
+        cdp.send("Input.dispatchTouchEvent", {"type": kind,
+                 "touchPoints": [{"x": px, "y": py, "id": 0} for (px, py) in pts]})
+
+    touch("touchStart", [(x, y)])
+    for k in range(1, 6):
+        touch("touchMove", [(x + 12 * k, y)])
+        page.wait_for_timeout(16)
+    page.evaluate("() => document.querySelector('[data-tool=skip]').click()")
+    page.wait_for_function("(a) => __ck.state().attemptId !== a", arg=s0["attemptId"], timeout=5000)
+    snap = page.evaluate("JSON.stringify(__ck.pieces())")
+    for k in range(6, 14):
+        touch("touchMove", [(x + 12 * k, y + 4 * k)])
+        page.wait_for_timeout(16)
+    touch("touchEnd", [])
+    page.wait_for_timeout(400)
+    after = page.evaluate("JSON.stringify(__ck.pieces())")
+    s1 = state(page)
+    fits_all = page.evaluate("__ck.pieces().every((_, i) => __ck.fits(i))")
+    ring = page.evaluate("__ck.input.ringState().visible")
+    check("drag_then_skip_is_safe",
+          s1["puzzleId"] != s0["puzzleId"] and snap == after and fits_all and not ring and not errors,
+          f"ids={s0['puzzleId']}->{s1['puzzleId']} intact={snap == after} fits={fits_all} ring={ring} errors={errors[:2]}")
+    ctx.close()
+
+
+def load_failure_retry(browser, base):
+    """문제 은행을 한 번 못 받으면 안내 카드가 뜨고, 다시 불러오기로 이어서 할 수 있다."""
+    fails = {"n": 0}
+
+    def setup(page):
+        def handler(route):
+            if fails["n"] == 0:
+                fails["n"] += 1
+                route.fulfill(status=503, body="busy")
+            else:
+                route.continue_()
+        page.route("**/data/puzzles-s1.json", handler)
+
+    ctx, page, errors = open_game(browser, base, setup=setup, wait_puzzle=False)
+    page.wait_for_function("() => __ck.state().loadFailed", timeout=8000)
+    card = visible(page, "#loadFail")
+    text = page.inner_text("#loadFail")
+    shot(page, "load-fail")
+    s0 = state(page)
+    page.click("#loadFail [data-tool=retry]")
+    page.wait_for_function("() => __ck.state().puzzleId", timeout=8000)
+    page.wait_for_timeout(200)
+    s1 = state(page)
+    card_after = visible(page, "#loadFail")
+    check("load_failure_retry",
+          card and "문제를 불러오지 못했어요" in text and s0["puzzleId"] is None and bool(s1["puzzleId"])
+          and not s1["loadFailed"] and not card_after and s1["streak"] == 0 and fails["n"] == 1 and not errors,
+          f"card={card} id={s0['puzzleId']}->{s1['puzzleId']} card_after={card_after} fails={fails['n']} errors={errors[:2]}")
     ctx.close()
 
 
@@ -260,7 +343,8 @@ def main():
             browser = p.chromium.launch(channel="msedge")
             try:
                 for fn in (solve_shows_win_and_scores, two_solves_promote_to_stage2, all_on_board_wrong_shakes,
-                           easy_hint_after_60s, skip_lowers_streak, stage4_alt_shape_accepted, help_keeps_puzzle):
+                           easy_hint_after_60s, skip_lowers_streak, stage4_alt_shape_accepted, help_keeps_puzzle,
+                           drag_then_skip_is_safe, load_failure_retry):
                     try:
                         fn(browser, base)
                     except Exception as e:  # 한 시험이 죽어도 나머지는 돈다

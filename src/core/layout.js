@@ -139,24 +139,31 @@ export function placeStarts(pieceCellsList, fp, rng) {
       return false; // 계속 찾는다
     }
     const { rad, list } = variants[i];
+    // 뒤(270도) 조각은 화면에서 판·목표 모양 위로 덜 겹치게 목표 지점을 작업대 끝(반지름 R)에 둔다.
+    // 들어가는 자리 중 그쪽으로 가장 먼 곳이 골라진다(R16a).
+    const back = Math.sin(rad) < -0.7;
     // 모든 눕힌 방향의 후보 자리를 한데 모아 (목표까지 거리 + 방향 순서 벌점) 순으로 시도한다.
     // 첫 방향이 목표 근처에 들어가지 못하면 다른 방향이 목표 자리에 놓인다(멀리 밀려나지 않게).
     const cands = [];
     for (let v = 0; v < list.length; v++) {
       const cells = list[v];
       const [w, , d] = dims(cells);
-      const goal = [center.x + START_R * Math.cos(rad) - w / 2, center.z + START_R * Math.sin(rad) - d / 2];
+      const r = back ? ISLAND_R : START_R;
+      const goal = [center.x + r * Math.cos(rad) - w / 2, center.z + r * Math.sin(rad) - d / 2];
       const { cols, spots } = spotsFor(cells, forbidden, center, goal, SPOTS_PER_VARIANT);
       for (const s of spots) cands.push({ cells, cols, x: s.x, z: s.z, cost: s.dist + VARIANT_PENALTY * v });
     }
     cands.sort((a, b) => a.cost - b.cost); // 안정 정렬: 같으면 앞 방향·가까운 자리 먼저
     for (const c of cands) {
-      if (cost + c.cost >= bestCost) break; // 정렬돼 있으니 뒤는 더 비싸다
+      // 뒤 조각의 거리·벌점은 합계에 넣지 않는다(다른 조각 자리를 뒤 조각 때문에 다시 찾지 않게). 뒤 조각은
+      // 남은 자리 중 가장 좋은 곳 하나를 고른다.
+      const add = back ? 0 : c.cost;
+      if (cost + add >= bestCost) break; // 정렬돼 있으니 뒤는 더 비싸다
       if (++nodes > NODE_LIMIT) return false;
       const next = new Set(forbidden);
       addWithRing(next, c.cols.map(([cx, cz]) => [c.x + cx, c.z + cz]));
       chosen[i] = { cells: c.cells, x: c.x, z: c.z };
-      place(i + 1, next, cost + c.cost);
+      place(i + 1, next, cost + add);
     }
     return false;
   }

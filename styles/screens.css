@@ -116,9 +116,11 @@ button.easy[hidden],.chip[hidden]{display:none}
   border-radius:1.4cqw;padding:.8cqw 2cqw;box-shadow:0 .6cqw 0 var(--rim-shadow),0 1cqw 2cqw rgba(0,0,0,.3);white-space:nowrap}
 .bubble span::before{content:"";position:absolute;left:-1.3cqw;top:50%;width:1.6cqw;height:1.6cqw;background:var(--cream);
   border-left:.3cqw solid var(--rim);border-bottom:.3cqw solid var(--rim);transform:translateY(-50%) rotate(45deg)}
-#glFail{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(70%,640px);padding:2.4cqw 3cqw;text-align:center;
+#glFail,#loadFail{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(70%,640px);padding:2.4cqw 3cqw;text-align:center;
   font-weight:800;font-size:max(16px,1.8cqw);line-height:1.6;z-index:3;word-break:keep-all}
-#glFail[hidden]{display:none}
+#glFail[hidden],#loadFail[hidden]{display:none}
+#loadFail p{margin:0 0 1.2cqw}
+#loadFail .gold{font-size:max(18px,2.2cqw);padding:.6cqw 3cqw}
 
 /* ④ 정답 */
 #screen-win{z-index:3}

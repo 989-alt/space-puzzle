@@ -251,6 +251,7 @@ export function createWorld(renderer, scene, camera) {
     floorPoint,
     bounce: (i) => { if (entries[i]) entries[i].bounce = 1; },
     shakeBoard: () => { shakeT = SHAKE_TIME; },
+    stopShake: () => { shakeT = 0; shaker.position.x = 0; },
     setShadows,
     frame,
     // 판 좌표 -> 월드 좌표(화면 투영 등에 쓴다)
