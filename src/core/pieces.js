@@ -17,6 +17,9 @@ const ROT = {
   z: ([x, y, z]) => [-y, x, z],
 };
 
+// 한 점(벡터)을 axis 로 90도 돌린다(rotate 와 같은 방향). 반 칸 좌표에도 쓴다.
+export const turn = (v, axis) => ROT[axis](v);
+
 export function rotate(cells, axis) {
   return normalize(cells.map(ROT[axis]));
 }

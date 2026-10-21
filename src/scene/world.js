@@ -106,6 +106,7 @@ export function createWorld(renderer, scene, camera) {
   grid.add(board, ghost);
 
   let center = { x: 0, z: 0 };
+  let boardCells = new Set(); // 판 칸 "x,z"
   let entries = []; // {group, mat, wrongMat, sig, target:Vector3, bounce, cells, pos, lifted, cubes:[{m, c, wrong}]}
   let puzzleTarget = [];
   let ghostMeshes = new Map(); // 목표 칸 키 -> 반투명 칸 메시
@@ -119,6 +120,7 @@ export function createWorld(renderer, scene, camera) {
   function setPuzzle(target) {
     const fp = footprint(target);
     center = boardCenter(fp);
+    boardCells = fp.cells;
     grid.position.set(-center.x, 0, -center.z);
     clear(board);
     clear(ghost);
@@ -381,6 +383,8 @@ export function createWorld(renderer, scene, camera) {
     // 판 좌표 -> 월드 좌표(화면 투영 등에 쓴다)
     toWorld: (x, y, z) => { scene.updateMatrixWorld(); return grid.localToWorld(new THREE.Vector3(x, y, z)); },
     center: () => ({ ...center }),
+    // 판 칸 "x,z" 집합(돌리기가 판 밖 조각을 판 칸으로 들여보내지 않게 쓴다)
+    board: () => boardCells,
     // 조각이 따라가는 목표 위치(판 좌표, 끄는 중이면 띄운 높이 포함). 확인용
     pieceTarget: (i) => (entries[i] ? entries[i].target.toArray() : null),
   };

@@ -1,6 +1,6 @@
 // 작업대(반지름 6 원) 안 배치 규칙. 순수 함수만 둔다(React·브라우저 API 금지).
 // 좌표: 칸 [x, y, z], y가 위, +z가 앞. 각도는 도(degree), 0 = +x, 90 = +z(앞).
-import { dims, rotate, lieFlat, orientations } from './pieces.js';
+import { dims, rotate, lieFlat, orientations, normalize, turn } from './pieces.js';
 import { worldCells, occupiedSet, dropY } from './board.js';
 
 export const ISLAND_R = 6; // 작업대 반지름
@@ -226,8 +226,76 @@ export function movePiece(piece, x, z, pieces, center) {
   return settle(piece.cells, x, z, without(pieces, piece), center);
 }
 
-// 조각을 axis('x'|'y'|'z')로 90도 돌린다. 위치(최소 모서리)는 유지하고 작업대 안으로 끌어당긴 뒤
-// 떨어뜨린다. 새 객체를 돌려준다. piece 제외 규칙은 movePiece 와 같다.
-export function rotatePiece(piece, axis, pieces, center) {
-  return settle(rotate(piece.cells, axis), piece.pos[0], piece.pos[2], without(pieces, piece), center);
+// ---------- 돌리기 ----------
+// 예전에는 최소 모서리(pos x, z)를 고정하고 돌린 뒤 위에서 떨어뜨려, 돌린 모양이 옆 조각과 겹치면 그 위로
+// 올라탔다(2026-10-22 감사: 판 위 회전 4.5%, 판 밖 회전 3.2%가 판 칸으로 들어감). 이제는
+// 1) 조각의 가운데(회전 중심, 피벗)를 축으로 제자리에서 돌리고,
+// 2) 같은 높이(돌리기 전 바닥 높이 y0) 이하로 놓이는 가장 가까운 빈 자리(반경 ROT_R 칸, 작업대 안)를 찾고,
+// 3) 판 밖 조각이면 판 칸으로 들어가지 않는 자리만 쓴다.
+// 같은 높이 이하 자리가 없을 때만 가장 낮게 놓이는 가까운 자리(예전처럼 위에 얹힘)를 쓴다.
+const ROT_R = 2;
+const ROT_OFFSETS = (() => {
+  const out = [];
+  for (let dx = -ROT_R; dx <= ROT_R; dx++) for (let dz = -ROT_R; dz <= ROT_R; dz++) out.push([dx, dz]);
+  // 가까운 순. 같은 거리면 뒤(−z)·왼쪽(−x)보다 앞·오른쪽을 먼저(정해진 순서면 된다)
+  return out.sort((a, b) => Math.hypot(...a) - Math.hypot(...b) || b[1] - a[1] || b[0] - a[0]);
+})();
+
+// 피벗: 조각 칸 좌표(pos 기준) 위의 점. 세 좌표가 모두 정수(칸 모서리)이거나 모두 반정수(칸 가운데)여야
+// 어느 축으로 돌려도 칸이 칸으로 간다. 처음에는 조각을 감싼 상자의 가운데에 가장 가까운 그런 점을 쓰고,
+// 돌린 결과에 피벗을 같이 실어(pivot) 다음 돌리기도 같은 점을 축으로 한다. 그래서 네 번 돌리면 제자리다.
+const isPivot = (p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)
+  && (p.every((v) => Number.isInteger(v)) || p.every((v) => Number.isInteger(v - 0.5)));
+export function defaultPivot(cells) {
+  const d = dims(cells);
+  const half = d.filter((n) => n % 2 === 1).length >= 2; // 길이가 홀수인 축이 많으면 칸 가운데, 아니면 모서리
+  return d.map((n) => {
+    const c = n / 2;
+    const isHalf = n % 2 === 1;
+    return isHalf === half ? c : c - 0.5;
+  });
+}
+
+// piece 의 칸을 피벗 둘레로 돌린 결과 {cells(정규화), x, y, z(돌린 뒤 최소 모서리, 세계 칸), pivot(새 pos 기준)}
+function turnAbout(piece, axis) {
+  const base = normalize(piece.cells);
+  const shift = [0, 1, 2].map((k) => Math.min(...piece.cells.map((c) => c[k]))); // 정규화로 옮긴 만큼
+  const pv = isPivot(piece.pivot) ? piece.pivot.map((v, k) => v - shift[k]) : defaultPivot(base);
+  const moved = base.map((c) => {
+    const r = turn([c[0] + 0.5 - pv[0], c[1] + 0.5 - pv[1], c[2] + 0.5 - pv[2]], axis);
+    return [r[0] + pv[0] - 0.5, r[1] + pv[1] - 0.5, r[2] + pv[2] - 0.5];
+  });
+  const min = [0, 1, 2].map((k) => Math.min(...moved.map((c) => c[k])));
+  const cells = normalize(moved);
+  return {
+    cells,
+    x: piece.pos[0] + shift[0] + min[0],
+    z: piece.pos[2] + shift[2] + min[2],
+    pivot: pv.map((v, k) => v - min[k] + 0), // + 0: -0 을 0 으로
+  };
+}
+
+// 조각을 axis('x'|'y'|'z')로 90도 돌린다(위 규칙). 새 객체 {cells, pos, pivot}를 돌려준다.
+// board(선택): 판 칸 "x,z" 집합. 주면 판 밖에 있던 조각은 판 칸으로 들어가지 않는다.
+// piece 제외 규칙은 movePiece 와 같다.
+export function rotatePiece(piece, axis, pieces, center, board = null) {
+  const others = without(pieces, piece);
+  const occ = occupiedSet(others, -1);
+  const t = turnAbout(piece, axis);
+  const y0 = piece.pos[1];
+  const touchesBoard = (cells, x, z) => cells.some((c) => board.has(`${x + c[0]},${z + c[2]}`));
+  const keepOff = !!board && !touchesBoard(piece.cells, piece.pos[0], piece.pos[2]);
+  let fallback = null;
+  for (const [dx, dz] of ROT_OFFSETS) {
+    const x = t.x + dx;
+    const z = t.z + dz;
+    if (!fits(t.cells, x, z, center)) continue;
+    if (keepOff && touchesBoard(t.cells, x, z)) continue;
+    const y = dropY(t.cells, x, z, occ);
+    if (y <= y0) return { cells: t.cells, pos: [x, y, z], pivot: t.pivot };
+    if (!fallback || y < fallback.pos[1]) fallback = { cells: t.cells, pos: [x, y, z], pivot: t.pivot };
+  }
+  if (fallback) return fallback;
+  // 반경 안에 작업대 안 자리가 없다(작업대 가장자리에서 길게 세움 등): 예전처럼 끌어당겨 떨어뜨린다
+  return { ...settle(t.cells, t.x, t.z, others, center), pivot: t.pivot };
 }

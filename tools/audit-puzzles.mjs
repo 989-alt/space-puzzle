@@ -155,9 +155,9 @@ export function startState(p, seed) {
 }
 
 // input.js onRingClick: rotatePiece -> setPiece -> settle()
-function uiRotate(pieces, i, axis, center) {
+function uiRotate(pieces, i, axis, center, board) {
   const ps = pieces.slice();
-  ps[i] = rotatePiece(pieces[i], axis, pieces, center);
+  ps[i] = rotatePiece(pieces[i], axis, pieces, center, board);
   return settleAll(ps);
 }
 // input.js dragTo: movePiece(반올림한 정수 x, z) -> setPiece -> settle(drag.i)
@@ -220,12 +220,24 @@ export function playOrder(p, sol, order, startPieces, { variant = 'rotateFirst',
   const center = boardCenter(fp);
   let ps = startPieces.map((q) => ({ cells: q.cells, pos: [...q.pos] }));
   const placed = [];
-  const stats = { rotations: 0, hops: 0, hopsOnBoard: 0, onBoard: 0 };
+  const stats = { rotations: 0, hops: 0, hopsOnBoard: 0, onBoard: 0, aside: 0, far: 0, floating: 0 };
   const rot = (a, i) => {
     const before = worldCells(ps[i]);
     const y0 = ps[i].pos[1];
-    ps = uiRotate(ps, i, a, center);
+    // 다른 조각이 없을 때 돌아갈 제자리(같은 작업대)
+    const alone = rotatePiece(ps[i], a, [ps[i]], center);
+    ps = uiRotate(ps, i, a, center, fp.cells);
     stats.rotations++;
+    // 다른 조각 때문에 제자리에서 옆으로 비켰는가, 그중 한 칸 넘게 비켰는가
+    const d = Math.hypot(ps[i].pos[0] - alone.pos[0], ps[i].pos[2] - alone.pos[2]);
+    if (d > 0) stats.aside++;
+    if (d > 1) stats.far++;
+    // 떠 있는 조각: 바닥(y=0)이 아닌데 바로 아래에 받치는 쌓기나무가 하나도 없음
+    ps.forEach((q, j) => {
+      if (q.pos[1] === 0) return;
+      const occ = occupiedSet(ps, j);
+      if (!worldCells(q).some((c) => occ.has(key([c[0], c[1] - 1, c[2]])))) stats.floating++;
+    });
     const was = before.some((c) => fp.cells.has(`${c[0]},${c[2]}`));
     if (!was && worldCells(ps[i]).some((c) => fp.cells.has(`${c[0]},${c[2]}`))) stats.onBoard++;
     // 돌린 조각이 다른 조각 위로 올라탔는가(돌리기 전보다 높아짐), 그중 판 칸 위로 올라탔는가
@@ -308,7 +320,7 @@ export function checkReach(p, { seeds = SEEDS, full = true } = {}) {
     id: p.id, solutions: sols.length, orderCounts: [], totalOrders: perms(p.pieces.length).length,
     startBad: [], fails: [], played: 0, modelMismatch: [],
     // [돌린 횟수, 다른 조각 위로 올라탄 횟수, 그중 판 위, 판 밖에서 돌렸는데 판 칸으로 들어간 횟수]
-    hops: { rotateFirst: [0, 0, 0, 0], moveFirst: [0, 0, 0, 0] },
+    hops: { rotateFirst: [0, 0, 0, 0, 0, 0, 0], moveFirst: [0, 0, 0, 0, 0, 0, 0] },
   };
   if (!sols.length) { out.fails.push('solver found no solution'); return out; }
   const orders = sols.map(validOrders);
@@ -332,6 +344,7 @@ export function checkReach(p, { seeds = SEEDS, full = true } = {}) {
           if (r.stats) {
             const h = out.hops[variant];
             h[0] += r.stats.rotations; h[1] += r.stats.hops; h[2] += r.stats.hopsOnBoard; h[3] += r.stats.onBoard;
+            h[4] += r.stats.aside; h[5] += r.stats.far; h[6] += r.stats.floating;
           }
           if (!r.ok) out.fails.push(`seed ${seed} sol ${si} order [${order}] ${variant}${direct ? '/direct' : ''}: step ${r.step}: ${r.reason}`);
         }
@@ -622,8 +635,8 @@ function main() {
   console.log(`E: 위·앞·옆 일치 모양 수 분포 ${J(hist(res.E.map((e) => e.viewShapes)))}`);
   console.log(`E: 조각으로 쌓을 수 있는 다른 정답 수 분포 ${J(hist(res.E.map((e) => e.alternatives)))}`);
   console.log(`E: 다른 정답이 있는 문제 ${eAlt.length}개: ${eAlt.map((e) => `${e.id}(${e.alternatives})`).join(' ')}`);
-  const sumH = (v) => B.reduce((a, r) => a.map((n, k) => n + r.hops[v][k]), [0, 0, 0, 0]);
-  console.log(`B: 링으로 돌린 결과 [돌림, 다른 조각 위로 올라탐, 그중 판 위, 판 밖->판 칸 진입] 시작 자리에서 ${J(sumH('rotateFirst'))}, 판 위에서 ${J(sumH('moveFirst'))}`);
+  const sumH = (v) => B.reduce((a, r) => a.map((n, k) => n + r.hops[v][k]), [0, 0, 0, 0, 0, 0, 0]);
+  console.log(`B: 링으로 돌린 결과 [돌림, 다른 조각 위로 올라탐, 그중 판 위, 판 밖->판 칸 진입, 제자리에서 옆으로 비킴, 그중 1칸 넘게, 떠 있는 조각] 시작 자리에서 ${J(sumH('rotateFirst'))}, 판 위에서 ${J(sumH('moveFirst'))}`);
   const solField = B.filter((r) => Math.min(r.solutions, SOLUTION_LIMIT) !== Math.min(res.bank.get(r.id).solutions, SOLUTION_LIMIT));
   console.log(`A: solutions 필드와 solver 해답 수(최대 ${SOLUTION_LIMIT}) 다른 문제 ${solField.length}개 ${solField.map((r) => `${r.id}(${res.bank.get(r.id).solutions} vs ${r.solutions})`).join(' ')}`);
   console.log(`단서 카드 배치 ${J(res.conventions)}`);

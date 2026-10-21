@@ -22,6 +22,11 @@ test('B/C reachable through game mechanics (5 seeds) + at least one drop order',
     // 시드 1에서만 모든 순서를 놓아 보고 나머지 시드는 첫 순서만(시간)
     const r = checkReach(p, { full: false });
     if (r.fails.length || r.startBad.length || !(r.maxOrders >= 1)) fails.push([p.id, r.fails, r.startBad]);
+    // 링으로 돌릴 때 다른 조각 위로 올라타거나(1) 판 밖에서 판 칸으로 들어가거나(3) 떠 있는 조각(6)이 없다
+    for (const v of ['rotateFirst', 'moveFirst']) {
+      const h = r.hops[v];
+      if (h[1] || h[3] || h[6]) fails.push([p.id, v, h]);
+    }
   }
   assert.deepEqual(fails, []);
 });

@@ -1,6 +1,7 @@
 // 입력: 조각 끌기, 톡 누르기·길게 누르기 → 돌리기 링(버튼 3개), 빈 곳 끌기·두 손가락 → 회전판.
 // 포인터 이벤트 하나로 터치(학교 태블릿·크롬북)와 마우스(교사 PC)를 함께 처리한다.
-// 조각 좌표는 판 좌표다. 끌기·돌리기 결과는 movePiece/rotatePiece 로 만들고(작업대 안, 위에서 떨어뜨림)
+// 조각 좌표는 판 좌표다. 끌기·돌리기 결과는 movePiece/rotatePiece 로 만들고(작업대 안, 위에서 떨어뜨림.
+// 돌리기는 제자리에서 돌고 옆 조각과 겹치면 같은 높이의 가까운 빈 자리로 비킨다)
 // setPiece(i, piece) 로 넘긴 뒤 world.updatePiece 로 화면에 반영한다. 그 뒤 settleAll 로 받침이 빠진 조각을 떨어뜨린다.
 import { movePiece, rotatePiece } from '../core/layout.js';
 import { settleAll } from '../core/board.js';
@@ -281,7 +282,7 @@ export function attachInput({
     const i = selected;
     const pieces = getPieces();
     if (!pieces[i]) return;
-    const next = rotatePiece(pieces[i], axis, pieces, world.center());
+    const next = rotatePiece(pieces[i], axis, pieces, world.center(), world.board ? world.board() : null);
     setPiece(i, next);
     world.updatePiece(i, next, { lift: false });
     world.bounce(i);
