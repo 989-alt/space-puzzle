@@ -10,6 +10,7 @@
   Edge 에서 이 방식은 pointerType 'touch' 포인터 이벤트를 만든다(시험마다 pointerType 을 기록해 확인한다).
 마우스 방식의 pointercancel 은 실제 장치로 만들 수 없어 캔버스에 PointerEvent('pointercancel') 를 보낸다.
 """
+import os
 import sys
 
 from playwright.sync_api import sync_playwright
@@ -17,6 +18,8 @@ from playwright.sync_api import sync_playwright
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8765"
 URL = f"{BASE}/tests/e2e/scene.html?noPerf&puzzle=proto"
 VIEW = {"width": 1120, "height": 700}
+OUT = os.path.join(os.path.dirname(__file__), "out")
+os.makedirs(OUT, exist_ok=True)
 
 
 class Pointer:
@@ -187,6 +190,48 @@ def ring_near_edge_not_clipped(page, ptr):
             and bb["y"] + bb["height"] <= VIEW["height"], f"clipped {bb}"
 
 
+# 모든 조각의 쌓기나무 윗면·앞면 가운데 중 화면에 보이는(pickPiece 가 그 조각을 고르는) 점이 링 버튼에 가린 것들
+COVERED_JS = """
+() => {
+  const c = document.getElementById('c').getBoundingClientRect();
+  const out = [];
+  __ck.pieces().forEach((p, j) => {
+    for (const q of p.cells) {
+      for (const [dy, dz] of [[0.95, 0.5], [0.5, 1.0]]) {
+        const s = __ck.project(p.pos[0] + q[0] + 0.5, p.pos[1] + q[1] + dy, p.pos[2] + q[2] + dz);
+        const ndc = { x: ((s.x - c.left) / c.width) * 2 - 1, y: -((s.y - c.top) / c.height) * 2 + 1 };
+        if (__ck.world.pickPiece(ndc) !== j) continue;
+        const e = document.elementFromPoint(s.x, s.y);
+        if (!e || e.id !== 'c') out.push([j, q, e && (e.id || e.tagName)]);
+      }
+    }
+  });
+  return out;
+}
+"""
+
+
+def ring_does_not_cover_pieces(page, ptr):
+    """링 버튼이 조각을 덮지 않는다: 링이 열린 채로 어느 조각을 눌러도 링 버튼이 아니라 캔버스가 받는다.
+    같은 조각을 다시 누르면 링이 그 조각에 다시 열리고, 다른 조각을 누르면 그 조각이 골라진다(돌아가지 않는다)."""
+    n = len(pieces(page))
+    for i in range(n):
+        ptr.tap(*xy(page, i))
+        page.wait_for_timeout(120)
+        assert page.evaluate("__ck.lastRing()")["index"] == i
+        before = pieces(page)
+        covered = page.evaluate(COVERED_JS)
+        assert covered == [], f"ring on piece {i} covers visible cube points {covered[:4]}"
+        j = (i + 1) % n
+        ptr.tap(*xy(page, j))
+        page.wait_for_timeout(120)
+        assert pieces(page) == before, "tapping another piece rotated something"
+        ring = page.evaluate("__ck.lastRing()")
+        assert ring["visible"] and ring["index"] == j, f"ring {ring}"
+    page.screenshot(path=os.path.join(OUT, f"ring-{ptr.mode}.png"))
+    assert page.evaluate("__ck.rotations") == []
+
+
 def long_press_opens_ring(page, ptr):
     a = xy(page, 2)
     ptr.down(*a)
@@ -345,6 +390,7 @@ def drag_support_away_top_lands(page, ptr):
 
 
 TESTS = [drag_moves_piece, drag_support_away_top_lands, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
+         ring_does_not_cover_pieces,
          long_press_opens_ring, empty_tap_hides_ring, empty_drag_spins, cancel_mid_drag_lands,
          ghost_pointer_then_drag_moves]
 TOUCH_ONLY = [second_finger_lands_then_spins]

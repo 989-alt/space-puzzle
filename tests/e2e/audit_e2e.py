@@ -86,6 +86,15 @@ TARGET_JS = """
 """
 
 results = []
+HIDE_RING = "--hide-ring" in sys.argv
+STATS = {}
+
+# 화면 점에서 맨 위 요소: canvas / ring-button / other
+HIT_JS = """
+([x, y]) => { const el = document.elementFromPoint(x, y); if (!el) return 'none';
+  if (el.id === 'c') return 'canvas'; if (el.closest('#ring button')) return 'ring-button';
+  return el.id || el.tagName.toLowerCase(); }
+"""
 
 
 def check(name, ok, detail=""):
@@ -123,17 +132,27 @@ def solve_by_ui(page, pid, stage):
         goal = plan["sol"][i]
         # 1) 링으로 돌리기
         for axis in plan["paths"][i]:
+            if HIDE_RING:
+                page.evaluate("__ck.input.hideRing()")
             pt, n_ok, tried = pick_point(page, i)
             if pt is None:
                 return False, f"piece {i}: cannot pick for rotate (0/{tried} points)"
+            hit = page.evaluate(HIT_JS, [pt["x"], pt["y"]])
+            if hit != "canvas":
+                STATS["click_on_" + hit] = STATS.get("click_on_" + hit, 0) + 1
+            before = page.evaluate(f"__ck.pieces()[{i}].cells")
             page.mouse.click(pt["x"], pt["y"])
+            mid = page.evaluate(f"__ck.pieces()[{i}].cells")
+            if mid != before:
+                STATS["piece_click_rotated"] = STATS.get("piece_click_rotated", 0) + 1
             page.wait_for_timeout(120)
             ring = page.evaluate("__ck.input.ringState()")
             if not ring["visible"] or ring["index"] != i:
                 return False, f"piece {i}: ring not opened for it ({ring})"
             page.click(f"#ring button[data-axis='{axis}']")
             page.wait_for_timeout(SETTLE_MS)
-        page.evaluate("__ck.input.hideRing()")
+        if HIDE_RING:
+            page.evaluate("__ck.input.hideRing()")
         cells = page.evaluate(f"__ck.pieces()[{i}].cells")
         if json.dumps(sorted(cells)) != json.dumps(sorted(goal["cells"])):
             return False, f"piece {i}: orientation after ring {cells} != {goal['cells']}"
@@ -143,6 +162,9 @@ def solve_by_ui(page, pid, stage):
             return False, f"piece {i}: cannot pick for drag (0/{tried} points)"
         if n_ok < tried:
             notes.append(f"p{i} pickable {n_ok}/{tried}")
+        hit = page.evaluate(HIT_JS, [pt["x"], pt["y"]])
+        if hit != "canvas":
+            STATS["drag_on_" + hit] = STATS.get("drag_on_" + hit, 0) + 1
         tgt = page.evaluate(TARGET_JS, [i, pt["x"], pt["y"], goal["pos"][0], goal["pos"][2]])
         page.mouse.move(pt["x"], pt["y"])
         page.mouse.down()
@@ -159,7 +181,8 @@ def solve_by_ui(page, pid, stage):
 
 
 def main():
-    base = sys.argv[1] if len(sys.argv) > 1 else None
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    base = args[0] if args else None
     server = None
     if not base:
         server = start_server()
@@ -188,11 +211,14 @@ def main():
                     page.screenshot(path=os.path.join(OUT, f"audit-{pid}.png"))
                 check(f"ui_solve {pid}", ok, detail)
             check("no page errors", not errors, "; ".join(errors[:3]))
+            # 링이 열린 채로 조각을 누르거나 끌 때 그 점이 링 버튼에 가리면 안 된다(링 버튼이 조각을 덮음)
+            check("piece clicks not intercepted by ring", not STATS or HIDE_RING, json.dumps(STATS))
             ctx.close()
             browser.close()
     finally:
         if server:
             server.terminate()
+    print("stats:", json.dumps(STATS), "hide_ring:", HIDE_RING)
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     sys.exit(1 if failed else 0)

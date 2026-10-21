@@ -4,33 +4,20 @@
 // setPiece(i, piece) 로 넘긴 뒤 world.updatePiece 로 화면에 반영한다. 그 뒤 settleAll 로 받침이 빠진 조각을 떨어뜨린다.
 import { movePiece, rotatePiece } from '../core/layout.js';
 import { settleAll } from '../core/board.js';
+import { placeRing, BTN, RING_BUTTONS as RING_GEOM, LABEL_GAP } from './ringPlace.js';
 
 const DRAG_PX = 8; // 이보다 많이 움직여야 끌기
 const LONG_MS = 450; // 길게 누르기
 const SPIN_K = 0.008; // 회전판 감도(rad/px)
 const STALE_MS = 2000; // 이만큼 움직임 없는 포인터는 떼기를 놓친 유령으로 보고 버린다
 
-// 링 버튼 배치(링 중심 기준 px). 버튼 56px, 글자는 버튼 아래.
-const BTN = 56;
-const RING_BUTTONS = [
-  { axis: 'y', label: '돌리기', dx: 0, dy: -72,
-    icon: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>' },
-  { axis: 'x', label: '세우기', dx: -70, dy: 26,
-    icon: '<path d="M3 12h18"/><path d="m7 8 5-4 5 4"/><path d="m7 16 5 4 5-4"/>' },
-  { axis: 'z', label: '뒤집기', dx: 70, dy: 26,
-    icon: '<path d="M12 3v18"/><path d="m16 7 4 5-4 5"/><path d="m8 7-4 5 4 5"/>' },
-];
-const LABEL_GAP = BTN / 2 + 4; // 버튼 중심에서 글자 위쪽까지
-const LABEL_H = 26;
-const LABEL_HALF_W = 36;
-// 링 전체가 차지하는 범위(중심 기준) + 여백 → 화면 안에 다 들어오도록 중심을 제한한다
-const EDGE = 8;
-const EXT = {
-  left: Math.max(...RING_BUTTONS.map((b) => Math.max(BTN / 2, LABEL_HALF_W) - b.dx)) + EDGE,
-  right: Math.max(...RING_BUTTONS.map((b) => b.dx + Math.max(BTN / 2, LABEL_HALF_W))) + EDGE,
-  top: Math.max(...RING_BUTTONS.map((b) => BTN / 2 - b.dy)) + EDGE,
-  bottom: Math.max(...RING_BUTTONS.map((b) => b.dy + LABEL_GAP + LABEL_H)) + EDGE,
+// 링 버튼(링 중심 기준 px, 배율 k 를 곱한다). 버튼 56px, 글자는 버튼 아래. 자리·배율은 ringPlace.js 가 고른다.
+const ICONS = {
+  y: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  x: '<path d="M3 12h18"/><path d="m7 8 5-4 5 4"/><path d="m7 16 5 4 5-4"/>',
+  z: '<path d="M12 3v18"/><path d="m16 7 4 5-4 5"/><path d="m8 7-4 5 4 5"/>',
 };
+const RING_BUTTONS = RING_GEOM.map((b) => ({ ...b, icon: ICONS[b.axis] }));
 
 const STYLE_ID = 'ck-ring-style';
 const RING_CSS = `
@@ -70,6 +57,7 @@ function buildRing(doc) {
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"'
       + ` stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${b.icon}</svg>`;
     const small = doc.createElement('small');
+    small.dataset.axis = b.axis;
     small.textContent = b.label;
     small.style.left = `${b.dx}px`;
     small.style.top = `${b.dy + LABEL_GAP}px`;
@@ -92,6 +80,7 @@ export function attachInput({
   let spin = null; // {x, moved}
   let timer = 0;
   let selected = null;
+  let ringAt = null; // 떠 있는 링 {x, y, k}(스테이지 px)
 
   const ndcOf = (x, y) => {
     const r = canvas.getBoundingClientRect();
@@ -103,18 +92,37 @@ export function attachInput({
     return s / ptrs.size;
   };
 
+  // 링 자리: 고른 조각 둘레에서 버튼이 어떤 쌓기나무도 덮지 않는 가장 가까운 곳(ringPlace.js).
+  // prev 가 있으면(돌린 뒤) 버튼이 여전히 비어 있는 한 그 자리에 둔다(연달아 누르는 버튼이 도망가지 않게).
+  function placeRingFor(i, x, y, prev = null) {
+    const sr = stage.getBoundingClientRect();
+    const cr = canvas.getBoundingClientRect();
+    const ox = cr.left - sr.left;
+    const oy = cr.top - sr.top;
+    const boxes = (world.cubeBoxes ? world.cubeBoxes(getPieces()) : []).map((b) => ({
+      i: b.i, l: ox + b.l * cr.width, r: ox + b.r * cr.width, t: oy + b.t * cr.height, b: oy + b.b * cr.height,
+    }));
+    const at = placeRing({ boxes, sel: i, tap: { x: x - sr.left, y: y - sr.top }, W: sr.width, H: sr.height, prev });
+    ringAt = at;
+    ring.style.left = `${at.x}px`;
+    ring.style.top = `${at.y}px`;
+    for (const b of RING_BUTTONS) {
+      const btn = ring.querySelector(`button[data-axis="${b.axis}"]`);
+      const small = ring.querySelector(`small[data-axis="${b.axis}"]`);
+      btn.style.left = `${b.dx * at.k}px`;
+      btn.style.top = `${b.dy * at.k}px`;
+      small.style.left = `${b.dx * at.k}px`;
+      small.style.top = `${b.dy * at.k + LABEL_GAP}px`;
+    }
+  }
+
   function showRing(i, x, y) {
-    const r = stage.getBoundingClientRect();
-    const clamp = (v, lo, hi) => (lo > hi ? (lo + hi) / 2 : Math.min(Math.max(v, lo), hi));
-    const cx = clamp(x - r.left, EXT.left, r.width - EXT.right);
-    const cy = clamp(y - r.top, EXT.top, r.height - EXT.bottom);
-    ring.style.left = `${cx}px`;
-    ring.style.top = `${cy}px`;
+    placeRingFor(i, x, y);
     ring.classList.add('on');
     selected = i;
     onSelect(i, { x, y });
   }
-  const hideRing = () => ring.classList.remove('on');
+  const hideRing = () => { ring.classList.remove('on'); ringAt = null; };
   const clearTimer = () => { clearTimeout(timer); timer = 0; };
 
   // 중력: 받침이 빠진 다른 조각을 떨어뜨린다(except = 끄는 중인 조각, 움직이지 않음). 내려온 조각은 튀긴다.
@@ -278,6 +286,11 @@ export function attachInput({
     world.updatePiece(i, next, { lift: false });
     world.bounce(i);
     settle();
+    // 돌려서 모양이 바뀐 조각이 버튼 아래로 들어오면 링을 비켜 놓는다(비어 있으면 그대로)
+    if (ringAt && ring.classList.contains('on')) {
+      const sr = stage.getBoundingClientRect();
+      placeRingFor(i, sr.left + ringAt.x, sr.top + ringAt.y, ringAt);
+    }
     onRotate(i, axis);
   }
 
@@ -325,6 +338,7 @@ export function attachInput({
       index: selected,
       x: parseFloat(ring.style.left) || 0,
       y: parseFloat(ring.style.top) || 0,
+      k: ringAt ? ringAt.k : 1,
     }),
     hideRing,
   };

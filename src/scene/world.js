@@ -279,6 +279,28 @@ export function createWorld(renderer, scene, camera) {
     return { x: v.x, z: v.z };
   }
 
+  // 쌓기나무 하나하나가 화면에서 차지하는 사각형(꼭짓점 8개를 투영한 범위). 캔버스 기준 0..1 좌표.
+  // pieces 의 판 좌표(움직이는 중 애니메이션 위치가 아니라 놓일 자리)를 쓴다. 돌리기 링 자리를 고를 때 쓴다.
+  const corner = new THREE.Vector3();
+  function cubeBoxes(pieces) {
+    scene.updateMatrixWorld();
+    const out = [];
+    pieces.forEach((p, i) => {
+      for (const c of p.cells) {
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        for (let k = 0; k < 8; k++) {
+          corner.set(p.pos[0] + c[0] + (k & 1), p.pos[1] + c[1] + ((k >> 1) & 1), p.pos[2] + c[2] + ((k >> 2) & 1));
+          grid.localToWorld(corner).project(camera);
+          const u = (corner.x + 1) / 2;
+          const v = (1 - corner.y) / 2;
+          l = Math.min(l, u); r = Math.max(r, u); t = Math.min(t, v); b = Math.max(b, v);
+        }
+        out.push({ i, l, t, r, b });
+      }
+    });
+    return out;
+  }
+
   // 그림자 켜기/끄기(저사양 모드)
   function setShadows(on) {
     dirty = true;
@@ -348,6 +370,7 @@ export function createWorld(renderer, scene, camera) {
     getSpin: () => turntable.rotation.y,
     pickPiece,
     floorPoint,
+    cubeBoxes,
     bounce: (i) => { if (entries[i]) { entries[i].bounce = 1; dirty = true; } },
     shakeBoard: () => { shakeT = SHAKE_TIME; dirty = true; },
     stopShake: () => { shakeT = 0; shaker.position.x = 0; dirty = true; },
