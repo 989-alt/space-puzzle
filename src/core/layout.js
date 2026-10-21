@@ -40,12 +40,14 @@ export function clampInside(cells, x, z, center) {
   return [px, pz];
 }
 
-// 시작 각도(앞이 90도, 뒤가 270도). 앞(90도)은 "앞" 표시 통로라 비우고 좌우 대칭으로 둔다.
-// 3개: 왼·오른·뒤, 4개: 왼·왼앞·오른앞·오른, 5개: 왼·왼앞·오른앞·오른·뒤.
+// 시작 각도(앞이 90도, 뒤가 270도). 앞(90도)은 "앞" 표시 통로라 비운다.
+// 판 뒤에 둔 조각은 카메라 시점 때문에 화면에서 목표 모양 위로 겹쳐 보이므로, 후보 각도 중 겹치는
+// 문제가 가장 적은 배치를 실측해 골랐다(R17, 160문제 × 시드 3개).
+// 3개: 왼·오른·오른앞, 4개: 왼·왼앞·오른앞·오른, 5개: 왼·왼앞·오른앞·오른·왼뒤.
 export function startAngles(n) {
-  if (n === 3) return [180, 0, 270];
+  if (n === 3) return [180, 0, 45];
   if (n === 4) return [180, 135, 45, 0];
-  if (n === 5) return [180, 135, 45, 0, 270];
+  if (n === 5) return [180, 135, 45, 0, 225];
   // 그 밖의 개수는 왼쪽(180)에서 오른쪽(0)까지 앞쪽 반원에 고르게 둔다.
   if (n === 1) return [90];
   return Array.from({ length: n }, (_, i) => 180 - (180 * i) / (n - 1));
@@ -89,10 +91,9 @@ const VARIANT_PENALTY = 0.75; // 정해진 눕힌 방향을 조금 더 선호
 // 찾는다. 앞 조각이 자리를 다 막아 뒤 조각이 들어갈 곳이 없으면(5x4 판 등) 되돌아가서 앞 조각의
 // 다음 후보 자리를 시도한다. 후보는 모든 눕힌 방향을 섞어 (거리 + 방향 순서 벌점 0.75) 순이다.
 // 끝내 안 되면 칸 수를 담은 Error 를 던진다. -> [{cells, x, z}] (y 는 dropY 로 따로 구한다)
-export function placeStarts(pieceCellsList, fp, rng) {
+export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceCellsList.length)) {
   const center = boardCenter(fp);
   const n = pieceCellsList.length;
-  const angles = startAngles(n);
   const base = new Set();
   addWithRing(base, [...fp.cells].map((k) => k.split(',').map(Number)));
   // "앞" 표시 바로 앞 통로(둘레 다음 줄부터 작업대 끝까지, 가운데 2~3열)도 비운다.
@@ -139,7 +140,7 @@ export function placeStarts(pieceCellsList, fp, rng) {
       return false; // 계속 찾는다
     }
     const { rad, list } = variants[i];
-    // 뒤(270도) 조각은 화면에서 판·목표 모양 위로 덜 겹치게 목표 지점을 작업대 끝(반지름 R)에 둔다.
+    // 뒤쪽(270도·225도 등) 조각은 화면에서 판·목표 모양 위로 덜 겹치게 목표 지점을 작업대 끝(반지름 R)에 둔다.
     // 들어가는 자리 중 그쪽으로 가장 먼 곳이 골라진다(R16a).
     const back = Math.sin(rad) < -0.7;
     // 모든 눕힌 방향의 후보 자리를 한데 모아 (목표까지 거리 + 방향 순서 벌점) 순으로 시도한다.

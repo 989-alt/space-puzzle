@@ -28,10 +28,10 @@ const near = (a, b) => Math.abs(a[0] - b[0]) <= 1 && Math.abs(a[1] - b[1]) <= 1;
 test('constants and helpers', () => {
   assert.equal(ISLAND_R, 6);
   assert.deepEqual(boardCenter({ w: 5, d: 4 }), { x: 2.5, z: 2 });
-  // 앞(90도)은 "앞" 표시 통로라 비우고 좌우 대칭으로 둔다(R14). 270 = 뒤.
-  assert.deepEqual(startAngles(3), [180, 0, 270]);
+  // 앞(90도)은 "앞" 표시 통로라 비운다(R14). 뒤(270도) 대신 화면 겹침이 가장 적은 각도(R17).
+  assert.deepEqual(startAngles(3), [180, 0, 45]);
   assert.deepEqual(startAngles(4), [180, 135, 45, 0]);
-  assert.deepEqual(startAngles(5), [180, 135, 45, 0, 270]);
+  assert.deepEqual(startAngles(5), [180, 135, 45, 0, 225]);
 });
 
 test('fits checks all four corners against r - 0.15', () => {
@@ -98,7 +98,7 @@ test('starts never overlap board ring or each other, all fit (all 160 puzzles x 
   assert.deepEqual(failed, []);
 });
 
-test('starts are tidy: left, right, back (long side along x)', () => {
+test('starts are tidy: left, right, front-right (long side along x)', () => {
   const p = bank.find((e) => e.id === 's1-001');
   const fp = footprint(p.target);
   const center = boardCenter(fp);
@@ -109,19 +109,19 @@ test('starts are tidy: left, right, back (long side along x)', () => {
   };
   assert.ok(mid(st[0])[0] < center.x, 'angle 180 is left');
   assert.ok(mid(st[1])[0] > center.x, 'angle 0 is right');
-  assert.ok(mid(st[2])[1] < center.z, 'angle 270 is back');
+  assert.ok(mid(st[2])[0] > center.x && mid(st[2])[1] > center.z, 'angle 45 is front-right');
   const [w2, , d2] = dims(st[2].cells);
-  assert.ok(w2 >= d2, 'back piece lies along x');
+  assert.ok(w2 >= d2, 'front-right piece lies along x');
 });
 
-// R16a: 뒤(270도) 조각은 작업대 끝으로 간다. 같은 x 에서 한 줄 더 뒤(z − 1)로 옮기면
+// R16a: 뒤쪽(5개일 때 225도) 조각은 작업대 끝으로 간다. 그 방향(x − 1, z − 1)으로 한 칸 더 옮기면
 // 작업대를 벗어나거나 판·다른 조각 둘레에 닿아야 한다(160문제 × 시드).
-test('back start piece sits at the farthest fitting row (all 160 puzzles x seeds)', () => {
+test('back start piece sits at the farthest fitting spot (all 160 puzzles x seeds)', () => {
   const bad = [];
   let checked = 0;
   for (const p of bank) {
     const angles = startAngles(p.pieces.length);
-    const bi = angles.indexOf(270);
+    const bi = angles.findIndex((a) => Math.sin((a * Math.PI) / 180) < -0.7);
     if (bi < 0) continue;
     const fp = footprint(p.target);
     const center = boardCenter(fp);
@@ -130,14 +130,16 @@ test('back start piece sits at the farthest fitting row (all 160 puzzles x seeds
       const st = placeStarts(p.pieces, fp, mulberry32(seed));
       const b = st[bi];
       const others = st.filter((_, j) => j !== bi).flatMap((s) => colsOf(s.cells, s.x, s.z));
-      const z = b.z - 1;
-      const clear = fits(b.cells, b.x, z, center)
-        && colsOf(b.cells, b.x, z).every((c) => !boardCols.some((q) => near(c, q)) && !others.some((q) => near(c, q)));
+      const a = (angles[bi] * Math.PI) / 180;
+      const x = b.x + Math.sign(Math.round(Math.cos(a) * 10));
+      const z = b.z + Math.sign(Math.round(Math.sin(a) * 10));
+      const clear = fits(b.cells, x, z, center)
+        && colsOf(b.cells, x, z).every((c) => !boardCols.some((q) => near(c, q)) && !others.some((q) => near(c, q)));
       if (clear) bad.push(`${p.id}#${seed}`);
       checked++;
     }
   }
-  assert.ok(checked > 200, `checked ${checked}`);
+  assert.ok(checked >= 24, `checked ${checked}`);
   assert.deepEqual(bad, []);
 });
 
