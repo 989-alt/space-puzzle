@@ -127,17 +127,24 @@ export function createWorld(renderer, scene, camera) {
   const sigOf = (cells) => cells.map((c) => c.join(',')).join(';');
 
   function build(e, cells) {
+    // 튀기기(눌렸다 펴지기)는 바닥 칸들의 가운데를 축으로 한다. pivot 을 그 점(y=0)에 두고
+    // 칸 메시는 pivot 기준으로 놓아, 크기를 바꿔도 조각이 한쪽으로 밀리지 않게 한다.
     clear(e.group);
+    e.pivot = new THREE.Group();
+    const px = cells.reduce((sum, c) => sum + c[0] + 0.5, 0) / cells.length;
+    const pz = cells.reduce((sum, c) => sum + c[2] + 0.5, 0) / cells.length;
+    e.pivot.position.set(px, 0, pz);
+    e.group.add(e.pivot);
     e.hits = [];
     for (const c of cells) {
       const m = new THREE.Mesh(cubeGeo, e.mat);
-      m.position.set(c[0] + 0.5, c[1] + 0.5, c[2] + 0.5);
+      m.position.set(c[0] + 0.5 - px, c[1] + 0.5, c[2] + 0.5 - pz);
       m.castShadow = true;
       m.receiveShadow = true;
       const h = new THREE.Mesh(hitGeo, hitMat);
       h.position.copy(m.position);
       h.userData.pieceIndex = e.index;
-      e.group.add(m, h);
+      e.pivot.add(m, h);
       e.hits.push(h);
     }
     e.sig = sigOf(cells);
@@ -218,9 +225,9 @@ export function createWorld(renderer, scene, camera) {
       if (e.bounce > 0) {
         e.bounce = Math.max(0, e.bounce - 0.08 * dt * 60);
         const s = 1 + Math.sin(e.bounce * Math.PI) * 0.06;
-        e.group.scale.set(s, 1 / s, s);
+        e.pivot.scale.set(s, 1 / s, s);
       } else {
-        e.group.scale.set(1, 1, 1);
+        e.pivot.scale.set(1, 1, 1);
       }
     }
     if (shakeT > 0) {

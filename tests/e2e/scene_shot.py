@@ -64,6 +64,15 @@ def main():
             if r["picked"] != list(range(len(r["picked"]))) or r["empty"] != -1:
                 errors.append(f"pickPiece mismatch {r}")
         page.close()
+        # 튀기기 중간 화면(바닥 가운데를 축으로 눌리는지 눈으로 확인)
+        page = browser.new_page(viewport={"width": 1120, "height": 700})
+        page.goto(f"{BASE}/tests/e2e/scene.html?noPerf&puzzle=proto")
+        page.wait_for_function("window.__ck && window.__ck.ready", timeout=20000)
+        page.wait_for_timeout(600)
+        page.evaluate("__ck.world.bounce(1)")
+        page.wait_for_timeout(90)
+        page.screenshot(path=str(OUT / "scene-bounce.png"))
+        page.close()
         # 저사양 모드(그림자 끔) 화면, WebGL 실패 시 null
         page = browser.new_page(viewport={"width": 1120, "height": 700})
         page.on("pageerror", lambda e: errors.append(f"low: {e}"))

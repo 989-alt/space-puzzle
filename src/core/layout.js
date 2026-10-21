@@ -93,6 +93,10 @@ export function placeStarts(pieceCellsList, fp, rng) {
   const angles = startAngles(n);
   const base = new Set();
   addWithRing(base, [...fp.cells].map((k) => k.split(',').map(Number)));
+  // 판 바로 앞 한 줄(둘레 1칸 다음 줄)도 비운다. 앞 조각이 "앞" 표시를 가리지 않게.
+  // 이 줄까지 비우면 자리가 없는 문제(s4-014 등)는 이 줄 없이 다시 찾는다.
+  const withLabel = new Set(base);
+  for (let x = -1; x <= fp.w; x++) withLabel.add(`${x},${fp.d + 1}`);
 
   // 각 조각의 방향 후보: 정해진 눕힌 방향 -> 긴 변을 반대 축으로 -> 같은 높이의 나머지 방향
   const variants = pieceCellsList.map((src, i) => {
@@ -135,7 +139,12 @@ export function placeStarts(pieceCellsList, fp, rng) {
     return false;
   }
 
-  if (!place(0, base)) {
+  let ok = place(0, withLabel);
+  if (!ok) {
+    nodes = 0;
+    ok = place(0, base);
+  }
+  if (!ok) {
     const cnt = pieceCellsList.map((c) => c.length).join('+');
     throw new Error(`작업대에 조각(${cnt}칸, 판 ${fp.w}x${fp.d})을 모두 놓을 자리가 없습니다`);
   }
