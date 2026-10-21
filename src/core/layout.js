@@ -62,8 +62,9 @@ function addWithRing(set, cols) {
   }
 }
 
-// 조각 하나의 후보 자리를 목표 지점에 가까운 순으로 돌려준다. 금지 칸·작업대 경계를 지킨 정수 위치만.
-function spotsFor(cells, forbidden, center, goal, limit) {
+// 조각 하나(한 방향)가 작업대 안(fits)에 들어가는 모든 정수 위치를 목표 지점에 가까운 순으로.
+// 금지 칸과 상관없으므로 탐색 전에 한 번만 구해 두고, 탐색 마디마다 금지 칸만 걸러 쓴다.
+function allSpots(cells, center, goal) {
   const cols = [...new Set(cells.map((c) => `${c[0]},${c[2]}`))].map((k) => k.split(',').map(Number));
   const x0 = Math.floor(center.x - ISLAND_R) - 1;
   const x1 = Math.ceil(center.x + ISLAND_R) + 1;
@@ -73,12 +74,22 @@ function spotsFor(cells, forbidden, center, goal, limit) {
   for (let x = x0; x <= x1; x++) {
     for (let z = z0; z <= z1; z++) {
       if (!fits(cells, x, z, center)) continue;
-      if (cols.some(([cx, cz]) => forbidden.has(`${x + cx},${z + cz}`))) continue;
-      found.push({ x, z, dist: Math.hypot(x - goal[0], z - goal[1]) });
+      found.push({ x, z, dist: Math.hypot(x - goal[0], z - goal[1]), keys: cols.map(([cx, cz]) => `${x + cx},${z + cz}`) });
     }
   }
   found.sort((a, b) => a.dist - b.dist); // 안정 정렬: 같은 거리면 x, z 작은 쪽 먼저
-  return { cols, spots: found.slice(0, limit) };
+  return { cols, all: found };
+}
+
+// 금지 칸을 피한 후보 자리 중 앞에서부터 limit 개
+function spotsFor(cached, forbidden, limit) {
+  const spots = [];
+  for (const s of cached.all) {
+    if (s.keys.some((k) => forbidden.has(k))) continue;
+    spots.push(s);
+    if (spots.length >= limit) break;
+  }
+  return spots;
 }
 
 const NODE_LIMIT = 20000;
@@ -124,7 +135,15 @@ export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceC
       const k = o.map((c) => c.join(',')).join(';');
       if (!seen.has(k)) { seen.add(k); list.push(o); }
     }
-    return { rad, list };
+    // 뒤쪽(270도·225도 등) 조각은 화면에서 판·목표 모양 위로 덜 겹치게 목표 지점을 작업대 끝(반지름 R)에 둔다.
+    // 들어가는 자리 중 그쪽으로 가장 먼 곳이 골라진다(R16a).
+    const back = Math.sin(rad) < -0.7;
+    const r = back ? ISLAND_R : START_R;
+    const spots = list.map((o) => {
+      const [w, , d] = dims(o);
+      return allSpots(o, center, [center.x + r * Math.cos(rad) - w / 2, center.z + r * Math.sin(rad) - d / 2]);
+    });
+    return { back, list, spots };
   });
 
   // 처음 찾은 배치(각 조각이 가장 가까운 자리)에서 멈추지 않고, 노드 한도 안에서 비용 합
@@ -141,20 +160,15 @@ export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceC
       bestCost = cost;
       return false; // 계속 찾는다
     }
-    const { rad, list } = variants[i];
-    // 뒤쪽(270도·225도 등) 조각은 화면에서 판·목표 모양 위로 덜 겹치게 목표 지점을 작업대 끝(반지름 R)에 둔다.
-    // 들어가는 자리 중 그쪽으로 가장 먼 곳이 골라진다(R16a).
-    const back = Math.sin(rad) < -0.7;
+    const { back, list, spots } = variants[i];
     // 모든 눕힌 방향의 후보 자리를 한데 모아 (목표까지 거리 + 방향 순서 벌점) 순으로 시도한다.
     // 첫 방향이 목표 근처에 들어가지 못하면 다른 방향이 목표 자리에 놓인다(멀리 밀려나지 않게).
     const cands = [];
     for (let v = 0; v < list.length; v++) {
-      const cells = list[v];
-      const [w, , d] = dims(cells);
-      const r = back ? ISLAND_R : START_R;
-      const goal = [center.x + r * Math.cos(rad) - w / 2, center.z + r * Math.sin(rad) - d / 2];
-      const { cols, spots } = spotsFor(cells, forbidden, center, goal, SPOTS_PER_VARIANT);
-      for (const s of spots) cands.push({ cells, cols, x: s.x, z: s.z, cost: s.dist + VARIANT_PENALTY * v });
+      const { cols } = spots[v];
+      for (const s of spotsFor(spots[v], forbidden, SPOTS_PER_VARIANT)) {
+        cands.push({ cells: list[v], cols, x: s.x, z: s.z, cost: s.dist + VARIANT_PENALTY * v });
+      }
     }
     cands.sort((a, b) => a.cost - b.cost); // 안정 정렬: 같으면 앞 방향·가까운 자리 먼저
     for (const c of cands) {

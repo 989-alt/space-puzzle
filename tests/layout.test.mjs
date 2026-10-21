@@ -216,3 +216,20 @@ test('placeStarts falls back to ignoring avoid when it leaves no room', () => {
   const st = placeStarts(p.pieces, fp, mulberry32(1), undefined, all);
   assert.equal(st.length, p.pieces.length);
 });
+
+test('placeStarts is fast enough not to freeze the screen (all 160 puzzles x 5 seeds)', () => {
+  // 목표는 이 PC 의 Node 에서 한 번 < 60ms(실측 최악 약 30ms). 다른 시험과 함께 돌 때 흔들림을 감안해 120ms 로 본다.
+  placeStarts(bank[0].pieces, footprint(bank[0].target), mulberry32(1)); // JIT 데우기
+  let worst = 0;
+  let worstId = '';
+  for (const p of bank) {
+    const fp = footprint(p.target);
+    for (const seed of [...SEEDS, 42, 99]) {
+      const t0 = performance.now();
+      placeStarts(p.pieces, fp, mulberry32(seed));
+      const dt = performance.now() - t0;
+      if (dt > worst) { worst = dt; worstId = `${p.id}#${seed}`; }
+    }
+  }
+  assert.ok(worst < 120, `worst ${worst.toFixed(1)}ms at ${worstId}`);
+});
