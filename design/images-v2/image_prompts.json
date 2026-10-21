@@ -1,0 +1,74 @@
+[
+ {
+  "filename": "title-bg.png",
+  "aspect": "16:9",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Wide title-screen background: a floating sky-island kingdom built entirely from giant colorful stacked toy cubes, castles and towers made of blocks, small waterfalls pouring off the island edges, sea of clouds, rainbow light rays, floating cube pieces in the sky. Keep the upper-center area as open bright sky for a game logo and the lower-center area calm for a start button. Cinematic depth."
+ },
+ {
+  "filename": "game-bg.png",
+  "aspect": "16:9",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Gameplay background: a cozy magical builder's workshop terrace on a floating island, a large round light-stone platform in the lower center seen from slightly above, with lots of empty clean space on it, shelves of colorful cubes and blueprints at the far edges, soft blurred bokeh background, gentle low-contrast pastel tones so 3D game pieces placed on top remain clearly readable."
+ },
+ {
+  "filename": "cubi-idle.png",
+  "aspect": "1:1",
+  "opaque": false,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Mascot design: 'Cubi', a cute chubby baby dragon whose body is made of soft rounded sky-blue and white cube segments, tiny golden horns, small translucent wings, big sparkling teal eyes, a glowing yellow cube gem on its chest. Full body, standing happily and waving one tiny claw, friendly smile."
+ },
+ {
+  "filename": "cubi-cheer.png",
+  "aspect": "1:1",
+  "opaque": false,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Mascot design: 'Cubi', a cute chubby baby dragon whose body is made of soft rounded sky-blue and white cube segments, tiny golden horns, small translucent wings, big sparkling teal eyes, a glowing yellow cube gem on its chest. Full body, jumping for joy with both arms raised, eyes closed happily, little stars bursting around it."
+ },
+ {
+  "filename": "cubi-think.png",
+  "aspect": "1:1",
+  "opaque": false,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Mascot design: 'Cubi', a cute chubby baby dragon whose body is made of soft rounded sky-blue and white cube segments, tiny golden horns, small translucent wings, big sparkling teal eyes, a glowing yellow cube gem on its chest. Full body, holding an orange L-shaped cube block and tilting its head curiously, one claw on its chin, thinking."
+ },
+ {
+  "filename": "island-1.png",
+  "aspect": "3:4",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Portrait card art: a small empty grassy floating rock island in a starry twilight sky, only a few scattered colorful toy cubes lying on the grass, a tiny sprout, hopeful mood, magical glow, centered composition."
+ },
+ {
+  "filename": "island-2.png",
+  "aspect": "3:4",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Portrait card art: the same small floating grassy island in a twilight sky, now with a cute little cottage built from colorful stacked toy cubes, a lantern glowing, a small tree, centered composition."
+ },
+ {
+  "filename": "island-3.png",
+  "aspect": "3:4",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Portrait card art: the same floating island grown larger, a lively village of several houses built from colorful stacked toy cubes, a bridge, windmill and waterfall, warm window lights, centered composition."
+ },
+ {
+  "filename": "island-4.png",
+  "aspect": "3:4",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Portrait card art: the same floating island now magnificent, a grand fairy-tale castle built from colorful stacked toy cubes with flags and towers, rainbow, fireworks of sparkles, triumphant mood, centered composition."
+ },
+ {
+  "filename": "tut-drag.png",
+  "aspect": "4:3",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Tutorial illustration on a clean cream background: a child's hand with one finger dragging a glossy orange L-shaped cube block across onto a square grid board, a curved motion arrow showing the drag path, simple and very clear."
+ },
+ {
+  "filename": "tut-rotate.png",
+  "aspect": "4:3",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Tutorial illustration on a clean cream background: a glossy blue cube block shaped like a 3D corner piece, surrounded by three round white buttons with circular rotation arrows, showing the block turning, simple and very clear."
+ },
+ {
+  "filename": "tut-view.png",
+  "aspect": "4:3",
+  "opaque": true,
+  "prompt": "High-quality Korean educational mobile game illustration, vibrant cel-shaded anime fantasy style with rich painterly detail, magical warm golden lighting, soft sparkles and glow, saturated jewel-tone colors, polished like a premium game key art. Tutorial illustration on a clean cream background: a small stacked structure of colorful cubes on a grid board, with a big curved orbit arrow around it and a small camera icon moving along the arrow, showing the view rotating around the structure, simple and very clear."
+ }
+]

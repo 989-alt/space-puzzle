@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>블록 퍼즐 시안 1문제</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#f1f3f5;font-family:system-ui,"Malgun Gothic",sans-serif;color:#212529}
+  #c{position:fixed;inset:0;touch-action:none}
+  .hud{position:fixed;top:10px;right:10px;background:#fff;border-radius:14px;padding:10px 14px;box-shadow:0 2px 8px #0002;font-size:15px;line-height:1.6}
+  .hud b{font-size:20px}
+  .clue{position:fixed;top:10px;left:10px;background:#fff;border-radius:14px;padding:10px;box-shadow:0 2px 8px #0002;width:250px}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+  .tabs button{flex:1 1 45%;border:0;border-radius:8px;padding:7px 4px;background:#e9ecef;font-size:12px;cursor:pointer}
+  .tabs button.on{background:#f08c00;color:#fff}
+  .g{display:grid;gap:3px;justify-content:center}
+  .g div{width:30px;height:30px;border-radius:4px;background:#e9ecef;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .g .f{background:#ffc078}
+  .cap{font-size:12px;color:#868e96;text-align:center;margin:4px 0 8px}
+  .views{display:flex;gap:10px;justify-content:center;align-items:flex-end}
+  .bottom{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px}
+  .bottom button{border:0;border-radius:12px;padding:12px 16px;font-size:15px;background:#fff;box-shadow:0 2px 8px #0002}
+  .help{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);font-size:13px;color:#495057;background:#fffd;padding:6px 12px;border-radius:10px;white-space:nowrap}
+  #ring{position:fixed;width:0;height:0;display:none}
+  #ring button{position:absolute;width:58px;height:58px;border-radius:50%;border:3px solid #f08c00;background:#fff;font-size:24px;transform:translate(-50%,-50%);box-shadow:0 2px 8px #0003}
+  #ring small{position:absolute;font-size:11px;transform:translate(-50%,0);white-space:nowrap;color:#e8590c;font-weight:700}
+  #win{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#0006}
+  #win div{background:#fff;border-radius:20px;padding:28px 36px;text-align:center}
+  #win h1{margin:0 0 8px;color:#f08c00}
+  #win button{margin-top:14px;border:0;border-radius:12px;padding:12px 20px;font-size:16px;background:#f08c00;color:#fff}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="clue">
+  <div class="tabs">
+    <button data-t="0" class="on">① 3D 모양</button>
+    <button data-t="1">② 위에서+수</button>
+    <button data-t="2">③ 층별</button>
+    <button data-t="3">④ 위·앞·옆</button>
+  </div>
+  <div id="clueBody"></div>
+</div>
+
+<div class="hud">
+  점수 <b id="score">0</b><br>
+  연속 정답 <b id="streak">0</b> · 배율 <b id="mult">×1</b><br>
+  시간 <span id="time">0</span>초
+</div>
+
+<div class="help">☝ 한 손가락: 조각 끌기 · 조각 탭/길게 누르기: 돌리기 · ✌ 두 손가락: 화면 돌리기·확대</div>
+<div class="bottom">
+  <button id="reset">🎥 처음 시점</button>
+  <button id="restart">↺ 다시 하기</button>
+</div>
+
+<div id="ring">
+  <button data-r="y" style="left:0;top:-70px">↻</button><small style="left:0;top:-38px">돌리기</small>
+  <button data-r="x" style="left:-66px;top:30px">⤵</button><small style="left:-66px;top:62px">앞으로 눕히기</small>
+  <button data-r="z" style="left:66px;top:30px">⤴</button><small style="left:66px;top:62px">옆으로 눕히기</small>
+</div>
+
+<div id="win"><div><h1>정답! 🎉</h1><div id="winMsg"></div><button id="again">다시 해 보기</button></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── 문제 데이터: 칸 = [x, 높이, z] ──
+// 목표 모양: 위에서 본 높이  z0: 2 2 2 1 / z1: 2 1 1 1  (12칸)
+const HEIGHTS = [[2,2,2,1],[2,1,1,1]]; // [z][x]
+const TARGET = [];
+HEIGHTS.forEach((row,z)=>row.forEach((h,x)=>{for(let y=0;y<h;y++)TARGET.push([x,y,z]);}));
+const key = c => c.join(',');
+const TARGET_SET = new Set(TARGET.map(key));
+
+// 조각 3개 (정답 배치를 쪼개서 만든 것 → 반드시 풀 수 있음)
+const PIECE_DEFS = [
+  { color:0x339af0, cells:[[0,0,0],[0,1,0],[0,1,1],[1,0,0]], start:[6,0,-3], rot:['y'] },
+  { color:0x51cf66, cells:[[0,0,0],[1,0,0],[2,0,0],[3,0,0]], start:[5,0,3],  rot:['y'] },
+  { color:0xff922b, cells:[[0,1,0],[1,1,0],[1,0,0],[2,0,0]], start:[8,0,0],  rot:['y','y'] },
+];
+
+// ── 3D 기본 ──
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf1f3f5);
+const camera = new THREE.PerspectiveCamera(45,1,0.1,200);
+const HOME_POS = new THREE.Vector3(4,12,14), HOME_TGT = new THREE.Vector3(4.5,0,1.5);
+camera.position.copy(HOME_POS);
+scene.add(new THREE.HemisphereLight(0xffffff,0xbbbbbb,1.2));
+const sun = new THREE.DirectionalLight(0xffffff,1.4); sun.position.set(5,10,7); scene.add(sun);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(HOME_TGT);
+controls.enablePan = false;
+controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE };
+controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+controls.maxPolarAngle = Math.PI*0.48; controls.minDistance = 6; controls.maxDistance = 25;
+controls.update();
+
+// 탁자 + 바닥판
+const grid = new THREE.GridHelper(20,20,0xced4da,0xdee2e6); grid.position.set(5,0,1); scene.add(grid);
+const boardMat = new THREE.MeshStandardMaterial({color:0xffe8cc});
+HEIGHTS.forEach((row,z)=>row.forEach((h,x)=>{
+  const t = new THREE.Mesh(new THREE.BoxGeometry(0.96,0.04,0.96), boardMat);
+  t.position.set(x+0.5,-0.02,z+0.5); scene.add(t);
+}));
+const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(4,0.05,2)), new THREE.LineBasicMaterial({color:0xf08c00}));
+frame.position.set(2,0,1); scene.add(frame);
+
+// 목표 고스트 (단서 ①)
+const ghost = new THREE.Group();
+const gGeo = new THREE.BoxGeometry(0.98,0.98,0.98);
+TARGET.forEach(([x,y,z])=>{
+  const m = new THREE.Mesh(gGeo,new THREE.MeshBasicMaterial({color:0xf08c00,transparent:true,opacity:0.12,depthWrite:false}));
+  m.position.set(x+0.5,y+0.5,z+0.5); ghost.add(m);
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(gGeo),new THREE.LineBasicMaterial({color:0xf08c00,transparent:true,opacity:0.5}));
+  e.position.copy(m.position); ghost.add(e);
+});
+scene.add(ghost);
+
+// ── 조각 ──
+const ROT = {
+  y:([x,y,z])=>[z,y,-x],
+  x:([x,y,z])=>[x,-z,y],
+  z:([x,y,z])=>[-y,x,z],
+};
+const norm = cells=>{const m=[0,1,2].map(i=>Math.min(...cells.map(c=>c[i])));return cells.map(c=>c.map((v,i)=>v-m[i]));};
+const cubeGeo = new THREE.BoxGeometry(0.96,0.96,0.96), edgeGeo = new THREE.EdgesGeometry(cubeGeo);
+let pieces = [];
+
+function build(p){
+  p.group.clear();
+  p.cells.forEach(c=>{
+    const m = new THREE.Mesh(cubeGeo,p.mat); m.position.set(c[0]+0.5,c[1]+0.5,c[2]+0.5); m.userData.piece=p; p.group.add(m);
+    const e = new THREE.LineSegments(edgeGeo,new THREE.LineBasicMaterial({color:0x343a40})); e.position.copy(m.position); p.group.add(e);
+  });
+}
+function occupiedExcept(p){const s=new Set();pieces.forEach(q=>{if(q!==p)q.cells.forEach(c=>s.add(key([c[0]+q.pos[0],c[1]+q.pos[1],c[2]+q.pos[2]])));});return s;}
+function drop(p){ // 위에서 떨어뜨려 가장 낮은 빈 자리에 놓기
+  const occ = occupiedExcept(p);
+  for(let y=0;y<12;y++){ if(p.cells.every(c=>!occ.has(key([c[0]+p.pos[0],c[1]+y,c[2]+p.pos[2]])))){p.pos[1]=y;break;} }
+  p.group.position.set(...p.pos);
+}
+function rotate(p,axis){ p.cells = norm(p.cells.map(ROT[axis])); build(p); drop(p); checkWin(); }
+
+function setup(){
+  pieces.forEach(p=>scene.remove(p.group));
+  pieces = PIECE_DEFS.map(d=>{
+    let cells = norm(d.cells); d.rot.forEach(a=>cells=norm(cells.map(ROT[a])));
+    const p = {cells, pos:[...d.start], mat:new THREE.MeshStandardMaterial({color:d.color}), group:new THREE.Group()};
+    build(p); scene.add(p.group); return p;
+  });
+  pieces.forEach(drop);
+  t0 = performance.now(); solved=false;
+}
+
+// ── 점수 (연속 정답 배율) ──
+let score=0, streak=0, t0=0, solved=false;
+const MULTS=[1,1.5,2,2.5,3];
+function checkWin(){
+  if(solved) return;
+  const all=new Set(); pieces.forEach(q=>q.cells.forEach(c=>all.add(key([c[0]+q.pos[0],c[1]+q.pos[1],c[2]+q.pos[2]]))));
+  if(all.size!==TARGET_SET.size) return;
+  for(const k of all) if(!TARGET_SET.has(k)) return;
+  solved=true;
+  const mult = MULTS[Math.min(streak,MULTS.length-1)];
+  const sec = Math.round((performance.now()-t0)/1000);
+  const gain = Math.round((100+Math.max(0,60-sec))*mult);
+  score+=gain; streak++;
+  document.getElementById('winMsg').innerHTML=`${sec}초 · 기본 100 + 빠르기 보너스 ${Math.max(0,60-sec)}<br>× 배율 ${mult} = <b>+${gain}점</b><br><small>다음 문제는 조각이 늘고 단서가 한 단계 어려워집니다</small>`;
+  document.getElementById('win').style.display='flex';
+  hud();
+}
+function hud(){
+  document.getElementById('score').textContent=score;
+  document.getElementById('streak').textContent=streak;
+  document.getElementById('mult').textContent='×'+MULTS[Math.min(streak,MULTS.length-1)];
+}
+setInterval(()=>{ if(!solved) document.getElementById('time').textContent=Math.floor((performance.now()-t0)/1000); },250);
+
+// ── 터치 조작 ──
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), floor = new THREE.Plane(new THREE.Vector3(0,1,0),0);
+const ptrs = new Map(); let drag=null, pressTimer=null, selected=null;
+const ringEl = document.getElementById('ring');
+function hitAt(x,y){ ndc.set(x/innerWidth*2-1,-(y/innerHeight)*2+1); ray.setFromCamera(ndc,camera); }
+function floorPoint(x,y){ hitAt(x,y); const v=new THREE.Vector3(); return ray.ray.intersectPlane(floor,v)?v:null; }
+function select(p){ pieces.forEach(q=>q.mat.emissive.setHex(0)); selected=p; if(p) p.mat.emissive.setHex(0x553300); }
+function showRing(x,y){ ringEl.style.left=Math.min(Math.max(x,80),innerWidth-80)+'px'; ringEl.style.top=Math.min(Math.max(y,90),innerHeight-110)+'px'; ringEl.style.display='block'; }
+function hideRing(){ ringEl.style.display='none'; }
+
+canvas.addEventListener('pointerdown',e=>{
+  ptrs.set(e.pointerId,e);
+  if(ptrs.size>1){ drag=null; clearTimeout(pressTimer); hideRing(); return; } // 두 손가락 → 화면 돌리기
+  hitAt(e.clientX,e.clientY);
+  const hit = ray.intersectObjects(pieces.flatMap(p=>p.group.children.filter(c=>c.isMesh)))[0];
+  if(!hit){ select(null); hideRing(); return; }
+  const p = hit.object.userData.piece, fp = floorPoint(e.clientX,e.clientY);
+  hideRing(); select(p);
+  drag = {p, sx:e.clientX, sy:e.clientY, moved:false, off: fp?[fp.x-p.pos[0],fp.z-p.pos[2]]:[0,0]};
+  pressTimer = setTimeout(()=>{ if(drag&&!drag.moved) showRing(e.clientX,e.clientY); },450);
+});
+canvas.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId,e);
+  if(!drag||ptrs.size>1) return;
+  if(!drag.moved && Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<8) return;
+  drag.moved=true; clearTimeout(pressTimer); hideRing();
+  const fp=floorPoint(e.clientX,e.clientY); if(!fp) return;
+  const p=drag.p;
+  p.pos[0]=Math.max(-4,Math.min(13,Math.round(fp.x-drag.off[0])));
+  p.pos[2]=Math.max(-5,Math.min(7,Math.round(fp.z-drag.off[1])));
+  drop(p);
+});
+function up(e){
+  ptrs.delete(e.pointerId);
+  if(drag){ clearTimeout(pressTimer); if(!drag.moved) showRing(e.clientX,e.clientY); else checkWin(); }
+  drag=null;
+}
+canvas.addEventListener('pointerup',up); canvas.addEventListener('pointercancel',up);
+ringEl.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ if(selected) rotate(selected,b.dataset.r); }));
+
+document.getElementById('reset').onclick=()=>{ camera.position.copy(HOME_POS); controls.target.copy(HOME_TGT); controls.update(); };
+document.getElementById('restart').onclick=()=>{ hideRing(); select(null); setup(); };
+document.getElementById('again').onclick=()=>{ document.getElementById('win').style.display='none'; hideRing(); select(null); setup(); };
+
+// ── 단서 패널 (난이도 사다리 미리보기) ──
+const cell=(n,f)=>`<div class="${f?'f':''}">${n??''}</div>`;
+function gridHTML(rows){ return `<div class="g" style="grid-template-columns:repeat(${rows[0].length},30px)">${rows.flat().join('')}</div>`; }
+function clue(t){
+  ghost.visible = (t===0);
+  const top = HEIGHTS.map(r=>r.map(h=>cell(h,h>0)));
+  const layer = L=>HEIGHTS.map(r=>r.map(h=>cell('',h>L)));
+  const front = [1,0].map(L=>HEIGHTS[0].map((_,x)=>cell('',Math.max(...HEIGHTS.map(r=>r[x]))>L)));
+  const side = [1,0].map(L=>HEIGHTS.map(r=>cell('',Math.max(...r)>L)));
+  const body = [
+    `<div class="cap">판 위에 주황색으로 비친 모양을 그대로 채우세요</div>`,
+    gridHTML(top)+`<div class="cap">위에서 본 모양 · 숫자 = 그 자리에 쌓인 개수</div>`,
+    gridHTML(layer(0))+`<div class="cap">1층</div>`+gridHTML(layer(1))+`<div class="cap">2층</div>`,
+    `<div class="views"><div>${gridHTML(top.map(r=>r.map(()=>cell('',1))))}<div class="cap">위</div></div><div>${gridHTML(front)}<div class="cap">앞</div></div><div>${gridHTML(side)}<div class="cap">옆</div></div></div><div class="cap">세 방향에서 본 모양만 보고 추리하기</div>`,
+  ][t];
+  document.getElementById('clueBody').innerHTML=body;
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',+b.dataset.t===t));
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>clue(+b.dataset.t));
+
+function resize(){ renderer.setSize(innerWidth,innerHeight,false); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize',resize); resize();
+setup(); clue(0); hud();
+renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene,camera); });
+</script>
+</body>
+</html>

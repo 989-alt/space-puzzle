@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디자인 시안 v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<style>
+:root{
+  --ink:#2A1A5E; --purple:#4B2A9A; --purple-2:#6A44C9; --gold-1:#FFF1A6; --gold-2:#FFC529; --gold-3:#F29B00; --gold-edge:#B4690A;
+  --cream:#FFF8E8; --chip:rgba(36,22,74,.72);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#17112E;color:#fff;font-family:Pretendard,system-ui,sans-serif;padding:28px 20px 60px}
+.page{max-width:1120px;margin:0 auto}
+.page>h1{font-family:Jua;font-weight:400;margin:0 0 4px;font-size:28px}
+.page>p{margin:0 0 26px;color:#C9C2E8}
+.shot{margin-bottom:44px}
+.shot>h2{font-family:Jua;font-weight:400;font-size:20px;margin:0 0 10px;color:#FFD86B}
+.shot>p{margin:10px 2px 0;color:#C9C2E8;font-size:14px;line-height:1.6}
+.stage{position:relative;width:100%;aspect-ratio:16/10;border-radius:22px;overflow:hidden;container-type:inline-size;box-shadow:0 20px 50px rgba(0,0,0,.5);user-select:none}
+.bg{position:absolute;inset:0;background-size:cover;background-position:center}
+.jua{font-family:Jua;font-weight:400}
+
+/* chips (reference: dark translucent pills) */
+.chip{position:absolute;display:inline-flex;align-items:center;gap:.6cqw;background:var(--chip);backdrop-filter:blur(6px);border-radius:999px;padding:.7cqw 1.4cqw;font-weight:700;font-size:1.3cqw;color:#fff;border:1px solid rgba(255,255,255,.18)}
+.chip i{width:.8cqw;height:.8cqw;border-radius:50%;background:#5EE1FF;display:inline-block}
+.chip svg{width:1.6cqw;height:1.6cqw}
+
+/* game logo lettering */
+.logo{position:absolute;text-align:center;line-height:.95}
+.lg{position:relative;display:block;font-family:Jua;font-weight:400;font-size:9.5cqw;letter-spacing:-.2cqw}
+.lg::before{content:attr(data-t);position:absolute;left:0;right:0;top:0;color:#2B1263;-webkit-text-stroke:1.5cqw #2B1263;text-shadow:0 1.1cqw 0 #2B1263,0 1.6cqw 2cqw rgba(0,0,0,.45);z-index:0}
+.lg span{position:relative;z-index:1;background:linear-gradient(180deg,#FFFBD6 0%,#FFE15C 40%,#FFB300 70%,#FF8A00 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lg.blue span{background:linear-gradient(180deg,#F0FDFF 0%,#8BE8FF 45%,#2FB4F5 75%,#1C7FE0 100%);-webkit-background-clip:text;background-clip:text}
+.sparkle{position:absolute;width:3cqw;height:3cqw;background:radial-gradient(circle,#fff 0 15%,transparent 16%),conic-gradient(from 45deg,transparent 0 10%,#FFF6C2 12% 13%,transparent 15% 35%,#FFF6C2 37% 38%,transparent 40% 60%,#FFF6C2 62% 63%,transparent 65% 85%,#FFF6C2 87% 88%,transparent 90%);filter:drop-shadow(0 0 .6cqw #FFE680)}
+
+/* gold glossy button */
+.gold{position:absolute;display:inline-flex;align-items:center;justify-content:center;gap:1cqw;font-family:Jua;font-weight:400;color:#5A2C00;border:.35cqw solid #FFF4B8;border-radius:999px;cursor:pointer;
+  background:linear-gradient(180deg,var(--gold-1) 0%,var(--gold-2) 48%,var(--gold-3) 100%);
+  box-shadow:0 .7cqw 0 var(--gold-edge),0 1.4cqw 2.4cqw rgba(40,10,0,.45),inset 0 .5cqw 0 rgba(255,255,255,.7),inset 0 -.5cqw 0 rgba(180,90,0,.35);
+  text-shadow:0 .15cqw 0 rgba(255,255,255,.6);transition:transform .15s ease-out}
+.gold:hover{transform:translateY(-.2cqw)} .gold:active{transform:translateY(.4cqw);box-shadow:0 .2cqw 0 var(--gold-edge),inset 0 .5cqw 0 rgba(255,255,255,.7)}
+.gold svg{width:1em;height:1em}
+.ghostbtn{position:absolute;font-family:Jua;color:#fff;background:var(--chip);border:2px solid rgba(255,255,255,.35);border-radius:999px;padding:.8cqw 2cqw;font-size:1.6cqw}
+
+/* subtitle pill */
+.pill{position:absolute;background:rgba(36,22,74,.78);border-radius:1.2cqw;padding:1cqw 2.4cqw;font-weight:800;font-size:1.9cqw;color:#fff;border:1px solid rgba(255,255,255,.2)}
+
+/* tutorial panels */
+.panel{position:absolute;top:21%;width:27.5%;height:60%;border-radius:1.6cqw;background:var(--cream);border:.45cqw solid #F3C24E;box-shadow:0 1cqw 0 #A86A12,0 1.6cqw 3cqw rgba(0,0,0,.4);overflow:hidden}
+.panel .hd{background:linear-gradient(180deg,var(--purple-2),var(--purple));color:#fff;font-family:Jua;font-size:2cqw;text-align:center;padding:1.1cqw .5cqw;border-bottom:.35cqw solid #F3C24E}
+.panel .hd b{color:#FFD86B;font-weight:400}
+.panel img{width:100%;height:58%;object-fit:cover;display:block}
+.panel p{margin:0;padding:1cqw 1.4cqw;color:var(--ink);font-weight:700;font-size:1.55cqw;line-height:1.45;text-align:center}
+.panel p em{font-style:normal;color:#C2410C}
+.star{position:absolute;top:-1.6cqw;left:50%;transform:translateX(-50%);width:3.2cqw;height:3.2cqw;background:radial-gradient(circle at 35% 30%,#FFF6C2,#FFC529 55%,#E08A00);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);z-index:2}
+.seg{position:absolute;display:flex;background:rgba(36,22,74,.8);border-radius:999px;padding:.4cqw;border:1px solid rgba(255,255,255,.2)}
+.seg span{font-family:Jua;font-size:1.5cqw;padding:.6cqw 1.6cqw;border-radius:999px;color:#C9C2E8;display:flex;gap:.5cqw;align-items:center}
+.seg span svg{width:1.6cqw;height:1.6cqw}
+.seg .on{background:linear-gradient(180deg,var(--gold-1),var(--gold-2));color:#5A2C00}
+
+/* game */
+#gameStage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.bar{margin:.6cqw auto 0;width:84%;height:.9cqw;border-radius:999px;background:rgba(255,255,255,.15);overflow:hidden;border:1px solid rgba(255,255,255,.3)}
+.bar i{display:block;height:100%;width:55%;background:linear-gradient(90deg,#7CF3FF,#FFE27A)}
+.mission{position:absolute;left:25%;right:22%;top:3.2%;text-align:center;font-family:Jua;font-size:3.1cqw;color:#2A1A5E;text-shadow:0 .2cqw 0 #fff,0 0 1.2cqw #fff}
+.clue{position:absolute;right:2%;top:11%;width:18%;border-radius:1.4cqw;background:rgba(255,248,232,.96);border:.35cqw solid #F3C24E;box-shadow:0 .8cqw 0 #A86A12,0 1.2cqw 2.4cqw rgba(0,0,0,.35);padding:1cqw;color:var(--ink)}
+.clue h3{margin:0 0 .6cqw;font-family:Jua;font-weight:400;font-size:1.6cqw;text-align:center;color:var(--purple)}
+.ctabs{display:grid;grid-template-columns:1fr 1fr;gap:.4cqw;margin-bottom:.8cqw}
+.ctabs button{border:0;border-radius:.8cqw;padding:.5cqw 0;font:700 1.05cqw Pretendard;background:#EFE6D2;color:#6B5B8C;cursor:pointer}
+.ctabs button.on{background:linear-gradient(180deg,var(--purple-2),var(--purple));color:#fff}
+.g{display:grid;gap:.3cqw;justify-content:center}
+.g div{width:2.3cqw;height:2.3cqw;border-radius:.4cqw;background:#E9DFC9;display:flex;align-items:center;justify-content:center;font-family:Jua;font-size:1.4cqw;color:#7A3B00}
+.g .f{background:linear-gradient(180deg,#FFD27A,#FFAA3B);box-shadow:inset 0 -.25cqw 0 rgba(160,70,0,.35)}
+.cap{font-size:1cqw;color:#7A6E95;text-align:center;margin:.3cqw 0 .7cqw;font-weight:700}
+.views{display:grid;grid-template-columns:auto auto;grid-template-areas:"top ." "front side";gap:.4cqw 1cqw;justify-content:center;align-items:end}
+.views>div{text-align:center}
+.views .g div{width:2cqw;height:2cqw}
+.views .cap{margin:.2cqw 0 0}
+.island{position:absolute;left:2%;top:10.5%;display:flex;align-items:center;gap:.8cqw;padding:.5cqw 1.2cqw .5cqw .5cqw;border-radius:999px;background:var(--chip);border:1px solid rgba(255,255,255,.22)}
+.island img{width:4.2cqw;height:4.2cqw;border-radius:50%;object-fit:cover;border:.25cqw solid #C9A2FF}
+.island small{display:block;font-size:1cqw;color:#C9C2E8;font-weight:700}
+.island b{display:block;font-family:Jua;font-weight:400;font-size:1.5cqw;color:#FFE27A}
+.island .bar{width:9cqw;margin:.3cqw 0 0}
+.hud{position:absolute;top:2.4%;display:flex;gap:.8cqw}
+.score{position:absolute;right:2%;top:2.4%;display:flex;align-items:center;gap:.8cqw;background:var(--chip);border-radius:999px;padding:.5cqw .6cqw .5cqw 1.4cqw;border:1px solid rgba(255,255,255,.2)}
+.score small{font-weight:700;font-size:1.2cqw;color:#C9C2E8}
+.score b{font-family:Jua;font-weight:400;font-size:2.4cqw;color:#FFE27A;font-variant-numeric:tabular-nums;background:rgba(0,0,0,.25);border-radius:999px;padding:0 1.2cqw}
+.combo{background:linear-gradient(180deg,#FF8A3D,#E8430F)!important;border-color:#FFD2A8!important}
+.tools{position:absolute;right:2%;bottom:3%;display:flex;gap:.8cqw}
+.tool{display:flex;flex-direction:column;align-items:center;gap:.2cqw;width:6.2cqw;padding:.7cqw 0;border-radius:1.2cqw;background:var(--chip);border:1px solid rgba(255,255,255,.22);color:#fff;font:700 1cqw Pretendard;cursor:pointer}
+.tool svg{width:2.2cqw;height:2.2cqw}
+#ring{position:absolute;width:0;height:0;display:none;z-index:5}
+#ring button{position:absolute;transform:translate(-50%,-50%);width:5.4cqw;height:5.4cqw;border-radius:50%;cursor:pointer;color:#5A2C00;
+  background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 50%,var(--gold-3));border:.3cqw solid #FFF4B8;box-shadow:0 .5cqw 0 var(--gold-edge),0 .9cqw 1.6cqw rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
+#ring button svg{width:2.6cqw;height:2.6cqw}
+#ring small{position:absolute;transform:translate(-50%,0);font-family:Jua;font-size:1.2cqw;color:#fff;background:rgba(36,22,74,.85);border-radius:.6cqw;padding:.1cqw .7cqw;white-space:nowrap}
+#solved{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%) scale(.6);opacity:0;transition:all .3s cubic-bezier(.3,1.6,.5,1);pointer-events:none;z-index:6}
+#solved.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+/* win */
+.rays{position:absolute;left:50%;top:42%;width:120cqw;height:120cqw;transform:translate(-50%,-50%);background:repeating-conic-gradient(from 0deg,rgba(255,236,150,.55) 0 7deg,transparent 7deg 18deg);-webkit-mask:radial-gradient(circle,#000 0 18%,transparent 55%);mask:radial-gradient(circle,#000 0 18%,transparent 55%);animation:spin 18s linear infinite}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.rays{animation:none}}
+.wincard{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:46%;padding:2.6cqw 2cqw 2cqw;border-radius:2cqw;background:var(--cream);border:.45cqw solid #F3C24E;box-shadow:0 1cqw 0 #A86A12,0 2cqw 4cqw rgba(0,0,0,.5);text-align:center;color:var(--ink)}
+.gain{font-family:Jua;font-size:7cqw;line-height:1;background:linear-gradient(180deg,#FFF1A6,#FFC529 50%,#F08A00);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 .35cqw 0 #B4690A)}
+.calc{display:flex;gap:.6cqw;justify-content:center;margin:1cqw 0 1.4cqw}
+.calc span{background:#F1E6CC;border-radius:.8cqw;padding:.5cqw 1cqw;font-weight:800;font-size:1.3cqw}
+.calc .x{background:linear-gradient(180deg,#FF8A3D,#E8430F);color:#fff}
+.grow{display:flex;align-items:center;gap:1.2cqw;justify-content:center;background:#EFE4FF;border-radius:1.2cqw;padding:1cqw;margin-bottom:1.6cqw}
+.grow img{width:7cqw;height:9cqw;object-fit:cover;border-radius:.8cqw;border:.25cqw solid #C9A2FF}
+.grow .arr{font-family:Jua;font-size:3cqw;color:var(--purple-2)}
+.grow p{margin:0;text-align:left;font-weight:800;font-size:1.4cqw;color:var(--purple)}
+.grow p b{display:block;font-family:Jua;font-weight:400;font-size:2cqw;color:#C2410C}
+.conf{position:absolute;width:1cqw;height:1.4cqw;border-radius:.2cqw}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+ <defs>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3.5v17a1 1 0 0 0 1.5.86l14-8.5a1 1 0 0 0 0-1.72l-14-8.5A1 1 0 0 0 6 3.5z"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-stand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="m7 8 5-4 5 4"/><path d="m7 16 5 4 5-4"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="m16 7 4 5-4 5"/><path d="m8 7-4 5 4 5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 1 2-2h2l2-3h6l2 3h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-skip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3.5 4.5 5.5 5.6 9.2A6.6 6.6 0 0 1 12 22a6.6 6.6 0 0 1-6.4-8.3c.5-1.9 1.8-3 2.4-4.6.4 1.6 1.1 2.7 2.3 3.3C10.1 9 10.6 5.3 12 2z"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h12v2h3v3a5 5 0 0 1-5 5h-.3A6 6 0 0 1 13 14.9V18h3v4H8v-4h3v-3.1A6 6 0 0 1 8.3 12H8a5 5 0 0 1-5-5V4h3zm0 4H5v1a3 3 0 0 0 1.2 2.4C6.1 8.9 6 8.4 6 8zm12 0v2c0 .4 0 .9-.2 1.4A3 3 0 0 0 19 7V6z"/></symbol>
+  <symbol id="i-touch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-mouse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="7"/><path d="M12 6v4"/></symbol>
+ </defs>
+</svg>
+
+<div class="page">
+<h1>큐브 왕국 디자인 시안 v2</h1>
+<p>issamGPT AI Mart 게임 스타일을 참고했습니다. 그림은 모두 GPT 이미지로 생성했고, 글자는 정확하게 나오도록 화면 위에 따로 올렸습니다. ③ 게임 화면은 실제로 조작해 볼 수 있습니다.</p>
+
+<!-- ① 시작 -->
+<div class="shot">
+ <h2>① 시작 화면</h2>
+ <div class="stage">
+  <div class="bg" style="background-image:url(/files/title-bg.png)"></div>
+  <span class="chip" style="left:2%;top:3%"><i></i>에듀 수학 게임</span>
+  <span class="chip" style="right:2%;top:3%"><i style="background:#FFE27A"></i>6학년 2학기 3단원 · 공간과 입체</span>
+  <div class="logo" style="left:50%;top:13%;transform:translateX(-50%)">
+   <span class="lg blue" data-t="큐브"><span>큐브</span></span>
+   <span class="lg" data-t="왕국 건축가"><span>왕국 건축가</span></span>
+  </div>
+  <div class="sparkle" style="left:27%;top:14%"></div><div class="sparkle" style="left:70%;top:33%;transform:scale(.7)"></div>
+  <div class="pill" style="left:50%;top:56%;transform:translateX(-50%)">조각을 쌓아 하늘섬 왕국을 지어요!</div>
+  <button class="gold" style="left:50%;top:67%;transform:translateX(-50%);font-size:4.6cqw;padding:1cqw 5cqw"><svg><use href="#i-play"/></svg>시작</button>
+  <button class="ghostbtn" style="left:50%;top:86%;transform:translateX(-50%)">조작 방법 보기</button>
+  <span class="chip" style="left:2%;bottom:3%;font-size:1.4cqw"><svg style="color:#FFE27A"><use href="#i-trophy"/></svg>내 최고 기록 2,480점 · 섬 3단계</span>
+  <img src="/files/cubi-idle.png" alt="마스코트 큐비" style="position:absolute;right:3%;bottom:2%;width:20%;filter:drop-shadow(0 1cqw 1.5cqw rgba(0,0,0,.35))">
+ </div>
+ <p>하늘섬 블록 왕국 그림 위에 입체 글자 로고와 금색 시작 버튼을 얹었습니다. 마스코트 "큐비"는 블록으로 된 아기 용입니다. 왼쪽 아래에는 기기에 저장된 내 최고 기록과 섬 단계가 보입니다.</p>
+</div>
+
+<!-- ② 조작 안내 -->
+<div class="shot">
+ <h2>② 처음 접속 시 조작 안내</h2>
+ <div class="stage">
+  <div class="bg" style="background-image:url(/files/title-bg.png);filter:blur(3px) brightness(.85);transform:scale(1.05)"></div>
+  <div class="logo" style="left:50%;top:3.5%;transform:translateX(-50%)"><span class="lg" data-t="이렇게 조작해요!" style="font-size:5cqw"><span>이렇게 조작해요!</span></span></div>
+  <div class="seg" style="right:2.5%;top:4.5%"><span class="on"><svg><use href="#i-touch"/></svg>터치</span><span><svg><use href="#i-mouse"/></svg>마우스</span></div>
+  <div class="panel" style="left:4%"><div class="star"></div><div class="hd"><b>1.</b> 끌어서 놓아요</div><img src="/files/tut-drag.png" alt=""><p>조각을 손가락으로 끌어<br><em>판 위</em>에 내려놓아요.</p></div>
+  <div class="panel" style="left:36.25%"><div class="star"></div><div class="hd"><b>2.</b> 톡 누르면 돌려요</div><img src="/files/tut-rotate.png" alt=""><p>조각을 누르면 나오는<br><em>돌리기·세우기·뒤집기</em> 버튼!</p></div>
+  <div class="panel" style="left:68.5%"><div class="star"></div><div class="hd"><b>3.</b> 화면을 돌려 봐요</div><img src="/files/tut-view.png" alt=""><p>빈 곳을 끌면 화면이 돌아요.<br><em>두 손가락</em>으로 확대도!</p></div>
+  <button class="gold" style="left:50%;bottom:4%;transform:translateX(-50%);font-size:3cqw;padding:.8cqw 4cqw">알겠어요, 시작!</button>
+  <span class="chip" style="left:2.5%;bottom:5%;font-size:1.2cqw">☐ 다음부터 보지 않기</span>
+ </div>
+ <p>참고한 게임처럼 번호가 붙은 3칸 그림 카드로 설명합니다. 오른쪽 위 토글로 터치용과 마우스용 문구가 바뀝니다. 마우스용은 "왼쪽 버튼으로 끌기 · 클릭하면 돌리기 · 빈 곳을 끌면 화면 회전 · 휠로 확대"입니다. 기기는 자동으로 알아봅니다.</p>
+</div>
+
+<!-- ③ 게임 -->
+<div class="shot">
+ <h2>③ 게임 화면 (직접 조작해 보세요)</h2>
+ <div class="stage" id="gameStage">
+  <div class="bg" style="background-image:url(/files/game-bg.png)"></div>
+  <canvas id="c"></canvas>
+  <div class="hud" style="left:2%"><span class="chip" style="position:static"><i></i>3단계 · 층별 단서</span><span class="chip combo" style="position:static"><svg><use href="#i-flame"/></svg>4연속 ×2</span></div>
+  <div class="mission">이 모양을 똑같이 쌓아요!</div>
+  <div class="score"><small>점수</small><b id="score">1,240</b></div>
+  <div class="island"><img src="/files/island-2.png" alt="지금의 섬"><div><small>내 섬 · 다음 단계까지 3문제</small><b>블록 오두막</b><div class="bar"><i></i></div></div></div>
+  <div class="clue"><h3>단서 카드</h3>
+   <div class="ctabs"><button data-t="0">3D 모양</button><button data-t="1">위+수</button><button data-t="2" class="on">층별</button><button data-t="3">위·앞·옆</button></div>
+   <div id="clueBody"></div>
+  </div>
+  <div class="tools">
+   <button class="tool" id="resetView"><svg><use href="#i-camera"/></svg>처음 시점</button>
+   <button class="tool" id="restart"><svg><use href="#i-undo"/></svg>다시 놓기</button>
+   <button class="tool"><svg><use href="#i-skip"/></svg>건너뛰기</button>
+   <button class="tool"><svg><use href="#i-help"/></svg>도움말</button>
+  </div>
+  <div id="ring">
+   <button data-r="y" style="left:0;top:-7.5cqw" aria-label="돌리기"><svg><use href="#i-rotate"/></svg></button><small style="left:0;top:-4.6cqw">돌리기</small>
+   <button data-r="x" style="left:-7cqw;top:3cqw" aria-label="세우기"><svg><use href="#i-stand"/></svg></button><small style="left:-7cqw;top:6cqw">세우기</small>
+   <button data-r="z" style="left:7cqw;top:3cqw" aria-label="뒤집기"><svg><use href="#i-flip"/></svg></button><small style="left:7cqw;top:6cqw">뒤집기</small>
+  </div>
+  <div id="solved"><span class="lg" data-t="완성!" style="font-size:8cqw"><span>완성!</span></span></div>
+ </div>
+ <p>그림으로 된 작업대 위에 3D 블록이 올라갑니다. 왼쪽은 문제를 풀수록 자라는 "지금의 섬" 카드, 오른쪽은 단계별 단서 카드입니다. 조각을 클릭하거나 탭하면 금색 버튼 3개가 나오고, 빈 곳을 끌면 화면이 돕니다. 마우스와 터치 모두 됩니다. 건너뛰기를 누르면 연속 기록이 한 단계 내려갑니다.</p>
+</div>
+
+<!-- ④ 정답 -->
+<div class="shot">
+ <h2>④ 정답 연출</h2>
+ <div class="stage">
+  <div class="bg" style="background-image:url(/files/game-bg.png);filter:blur(4px) brightness(.55);transform:scale(1.05)"></div>
+  <div class="rays"></div>
+  <div id="conf"></div>
+  <div class="logo" style="left:50%;top:4%;transform:translateX(-50%)"><span class="lg" data-t="완성!" style="font-size:8cqw"><span>완성!</span></span></div>
+  <div class="wincard">
+   <div class="gain">+268</div>
+   <div class="calc"><span>기본 100</span><span>빠르기 +34</span><span class="x">4연속 ×2</span></div>
+   <div class="grow"><img src="/files/island-2.png" alt=""><span class="arr">▶</span><img src="/files/island-3.png" alt=""><p>섬이 자랐어요!<b>블록 마을</b>다음: 조각 4개 · 위·앞·옆 단서</p></div>
+   <button class="gold" style="position:relative;font-size:2.8cqw;padding:.8cqw 4cqw">다음 문제</button>
+  </div>
+  <img src="/files/cubi-cheer.png" alt="" style="position:absolute;left:5%;bottom:3%;width:22%;filter:drop-shadow(0 1cqw 1.5cqw rgba(0,0,0,.4))">
+ </div>
+ <p>빛줄기가 돌고 색종이가 흩날립니다. 점수 계산 내역과 함께 섬이 한 단계 자라는 모습을 보여 줍니다. 섬은 빈 섬, 오두막, 마을, 성의 4단계입니다. 아래는 생성한 섬 4단계 그림입니다.</p>
+ <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px">
+  <img src="/files/island-1.png" style="width:100%;border-radius:12px"><img src="/files/island-2.png" style="width:100%;border-radius:12px"><img src="/files/island-3.png" style="width:100%;border-radius:12px"><img src="/files/island-4.png" style="width:100%;border-radius:12px">
+ </div>
+</div>
+</div>
+
+<script>
+(function(){const conf=document.getElementById('conf'),c=['#5EE1FF','#FFE27A','#FF8A3D','#B98CFF','#7CF39B'];for(let i=0;i<40;i++){const d=document.createElement('div');d.className='conf';d.style.left=(3+Math.random()*94)+'%';d.style.top=(3+Math.random()*90)+'%';d.style.background=c[i%5];d.style.transform='rotate('+Math.random()*180+'deg)';conf.appendChild(d);}})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const HEIGHTS=[[2,2,2,1],[2,1,1,1]];
+const TARGET=[];HEIGHTS.forEach((r,z)=>r.forEach((h,x)=>{for(let y=0;y<h;y++)TARGET.push([x,y,z]);}));
+const key=c=>c.join(','), TSET=new Set(TARGET.map(key));
+const DEFS=[
+ {color:0x3B9BFF,cells:[[0,0,0],[0,1,0],[0,1,1],[1,0,0]],start:[-2,0,0],rot:['y']},
+ {color:0x3DD47A,cells:[[0,0,0],[1,0,0],[2,0,0],[3,0,0]],start:[5,0,1],rot:['z']},
+ {color:0xFF8A2B,cells:[[0,1,0],[1,1,0],[1,0,0],[2,0,0]],start:[1,0,3],rot:['y','y']},
+];
+
+const stage=document.getElementById('gameStage'), canvas=document.getElementById('c');
+let renderer;try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});}catch(err){document.querySelector('.mission').textContent='3D를 켤 수 없어요 (브라우저 그래픽 설정 확인)';throw err;}
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(38,16/10,0.1,200);
+const HOME_POS=new THREE.Vector3(2,12.5,13), HOME_TGT=new THREE.Vector3(2,0.5,1);
+camera.position.copy(HOME_POS);
+scene.add(new THREE.HemisphereLight(0xfff6e0,0x8a7aa8,1.1));
+const sun=new THREE.DirectionalLight(0xffffff,2.2); sun.position.set(4,12,8); sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024); Object.assign(sun.shadow.camera,{left:-10,right:12,top:10,bottom:-10}); sun.shadow.radius=4; scene.add(sun);
+const fill=new THREE.DirectionalLight(0xb9a6ff,.6); fill.position.set(-6,5,-4); scene.add(fill);
+
+const controls=new OrbitControls(camera,canvas);
+controls.target.copy(HOME_TGT); controls.enablePan=false; controls.enableDamping=true;
+controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE};
+controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_ROTATE};
+controls.maxPolarAngle=Math.PI*0.47; controls.minDistance=8; controls.maxDistance=24; controls.update();
+
+// shadow catcher on the painted platform
+const catcher=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.ShadowMaterial({opacity:.22}));
+catcher.rotation.x=-Math.PI/2; catcher.receiveShadow=true; scene.add(catcher);
+// board
+const tileGeo=new RoundedBoxGeometry(.94,.14,.94,3,.05);
+const tileMat=new THREE.MeshStandardMaterial({color:0xFFE7B8,roughness:.6});
+HEIGHTS.forEach((r,z)=>r.forEach((h,x)=>{const t=new THREE.Mesh(tileGeo,tileMat);t.position.set(x+.5,-.05,z+.5);t.receiveShadow=true;scene.add(t);}));
+const rim=new THREE.Mesh(new RoundedBoxGeometry(4.5,.12,2.5,3,.06),new THREE.MeshStandardMaterial({color:0x6A44C9,roughness:.4,metalness:.1}));
+rim.position.set(2,-.12,1); rim.receiveShadow=true; scene.add(rim);
+// workspace: pieces must stay inside this circle around the board
+const WS={cx:2,cz:1,r:4.6};
+const wsRing=new THREE.Mesh(new THREE.RingGeometry(WS.r-.06,WS.r+.06,96),new THREE.MeshBasicMaterial({color:0xFFFFFF,transparent:true,opacity:.55,depthWrite:false}));
+wsRing.rotation.x=-Math.PI/2;wsRing.position.set(WS.cx,.01,WS.cz);scene.add(wsRing);
+function clampWS(p){const xs=p.cells.map(c=>c[0]),zs=p.cells.map(c=>c[2]);
+ const w=Math.max(...xs)+1,d=Math.max(...zs)+1;let cx=p.pos[0]+w/2,cz=p.pos[2]+d/2;
+ const lim=WS.r-Math.hypot(w,d)/2;const dx=cx-WS.cx,dz=cz-WS.cz,dist=Math.hypot(dx,dz);
+ if(dist>lim){cx=WS.cx+dx/dist*lim;cz=WS.cz+dz/dist*lim;p.pos[0]=Math.floor(cx-w/2+.5);p.pos[2]=Math.floor(cz-d/2+.5);}}
+// ghost (clue ①)
+const ghost=new THREE.Group(); const gg=new THREE.BoxGeometry(.98,.98,.98);
+TARGET.forEach(([x,y,z])=>{const m=new THREE.Mesh(gg,new THREE.MeshBasicMaterial({color:0xFFC529,transparent:true,opacity:.16,depthWrite:false}));m.position.set(x+.5,y+.5,z+.5);ghost.add(m);
+ const e=new THREE.LineSegments(new THREE.EdgesGeometry(gg),new THREE.LineBasicMaterial({color:0xFFB300,transparent:true,opacity:.8}));e.position.copy(m.position);ghost.add(e);});
+scene.add(ghost);
+
+const ROT={y:([x,y,z])=>[z,y,-x],x:([x,y,z])=>[x,-z,y],z:([x,y,z])=>[-y,x,z]};
+const norm=cs=>{const m=[0,1,2].map(i=>Math.min(...cs.map(c=>c[i])));return cs.map(c=>c.map((v,i)=>v-m[i]));};
+const cubeGeo=new RoundedBoxGeometry(.96,.96,.96,2,.12);
+let pieces=[], solved=false;
+function build(p){p.group.clear();p.cells.forEach(c=>{const m=new THREE.Mesh(cubeGeo,p.mat);m.position.set(c[0]+.5,c[1]+.5,c[2]+.5);m.castShadow=true;m.receiveShadow=true;m.userData.piece=p;p.group.add(m);});}
+function occ(p){const s=new Set();pieces.forEach(q=>{if(q!==p)q.cells.forEach(c=>s.add(key([c[0]+q.pos[0],c[1]+q.pos[1],c[2]+q.pos[2]])));});return s;}
+function drop(p){const o=occ(p);for(let y=0;y<12;y++){if(p.cells.every(c=>!o.has(key([c[0]+p.pos[0],c[1]+y,c[2]+p.pos[2]])))){p.pos[1]=y;break;}}p.target=new THREE.Vector3(...p.pos);}
+function rotate(p,a){p.cells=norm(p.cells.map(ROT[a]));clampWS(p);build(p);drop(p);p.group.position.copy(p.target);p.bounce=1;check();}
+function setup(){pieces.forEach(p=>scene.remove(p.group));solved=false;document.getElementById('solved').classList.remove('on');
+ pieces=DEFS.map(d=>{let cells=norm(d.cells);d.rot.forEach(a=>cells=norm(cells.map(ROT[a])));
+  const p={cells,pos:[...d.start],mat:new THREE.MeshStandardMaterial({color:d.color,roughness:.3,metalness:0}),group:new THREE.Group(),bounce:0};
+  build(p);scene.add(p.group);return p;});
+ pieces.forEach(p=>{drop(p);p.group.position.copy(p.target);});}
+function check(){if(solved)return;const all=new Set();pieces.forEach(q=>q.cells.forEach(c=>all.add(key([c[0]+q.pos[0],c[1]+q.pos[1],c[2]+q.pos[2]]))));
+ if(all.size!==TSET.size)return;for(const k of all)if(!TSET.has(k))return;solved=true;document.getElementById('solved').classList.add('on');
+ const s=document.getElementById('score');s.textContent=(1240+268).toLocaleString();}
+
+// input — capture on the stage so a press on a piece disables orbit before OrbitControls sees it
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),floor=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+const ringEl=document.getElementById('ring'); let drag=null,timer=null,selected=null,ptrs=0;
+function aim(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);}
+function fpt(e){aim(e);const v=new THREE.Vector3();return ray.ray.intersectPlane(floor,v)?v:null;}
+function sel(p){pieces.forEach(q=>q.mat.emissive.setHex(0));selected=p;if(p)p.mat.emissive.setHex(0x3a2a00);}
+function showRing(e){const r=stage.getBoundingClientRect();ringEl.style.left=Math.min(Math.max(e.clientX-r.left,r.width*.12),r.width*.86)+'px';ringEl.style.top=Math.min(Math.max(e.clientY-r.top,r.height*.2),r.height*.78)+'px';ringEl.style.display='block';}
+function hideRing(){ringEl.style.display='none';}
+stage.addEventListener('pointerdown',e=>{
+ if(e.target!==canvas)return; ptrs++;
+ if(ptrs>1){drag=null;clearTimeout(timer);hideRing();controls.enabled=true;return;}
+ aim(e);const hit=ray.intersectObjects(pieces.flatMap(p=>p.group.children))[0];
+ if(!hit){sel(null);hideRing();return;}
+ controls.enabled=false; canvas.setPointerCapture(e.pointerId);
+ const p=hit.object.userData.piece,f=fpt(e);hideRing();sel(p);
+ drag={p,sx:e.clientX,sy:e.clientY,moved:false,off:f?[f.x-p.pos[0],f.z-p.pos[2]]:[0,0]};
+ timer=setTimeout(()=>{if(drag&&!drag.moved)showRing(e);},450);
+},true);
+canvas.addEventListener('pointermove',e=>{
+ if(!drag)return; if(!drag.moved&&Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<8)return;
+ drag.moved=true;clearTimeout(timer);hideRing();const f=fpt(e);if(!f)return;const p=drag.p;
+ p.pos[0]=Math.round(f.x-drag.off[0]);p.pos[2]=Math.round(f.z-drag.off[1]);clampWS(p);p.pos[1]=0;drop(p);p.target.y+=.35;
+});
+function up(e){ptrs=Math.max(0,ptrs-1);if(drag){clearTimeout(timer);if(!drag.moved)showRing(e);else{drop(drag.p);drag.p.bounce=1;check();}}drag=null;controls.enabled=true;}
+canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+ringEl.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{if(selected)rotate(selected,b.dataset.r);}));
+document.getElementById('resetView').onclick=()=>{camera.position.copy(HOME_POS);controls.target.copy(HOME_TGT);controls.update();};
+document.getElementById('restart').onclick=()=>{hideRing();sel(null);setup();};
+
+// clue card
+const cell=(n,f)=>`<div class="${f?'f':''}">${n??''}</div>`;
+const grid=(rows,w)=>`<div class="g" style="grid-template-columns:repeat(${rows[0].length},${w||'2.3cqw'})">${rows.flat().join('')}</div>`;
+function clue(t){ghost.visible=t===0;
+ const top=HEIGHTS.map(r=>r.map(h=>cell(h,h>0))), layer=L=>HEIGHTS.map(r=>r.map(h=>cell('',h>L)));
+ const front=[1,0].map(L=>HEIGHTS[0].map((_,x)=>cell('',Math.max(...HEIGHTS.map(r=>r[x]))>L)));
+ const side=[1,0].map(L=>HEIGHTS.map(r=>cell('',Math.max(...r)>L)));
+ document.getElementById('clueBody').innerHTML=[
+  `<div class="cap" style="font-size:1.2cqw">판 위 노란 테두리 모양을<br>그대로 채워요</div>`,
+  grid(top)+`<div class="cap">위에서 본 모양 · 수 = 쌓인 개수</div>`,
+  grid(layer(0))+`<div class="cap">1층</div>`+grid(layer(1))+`<div class="cap">2층</div>`,
+  `<div class="views"><div style="grid-area:top">${grid(top.map(r=>r.map(()=>cell('',1))),'2cqw')}<div class="cap">위</div></div><div style="grid-area:front">${grid(front,'2cqw')}<div class="cap">앞</div></div><div style="grid-area:side">${grid(side,'2cqw')}<div class="cap">옆</div></div></div>`][t];
+ document.querySelectorAll('.ctabs button').forEach(b=>b.classList.toggle('on',+b.dataset.t===t));}
+document.querySelectorAll('.ctabs button').forEach(b=>b.onclick=()=>clue(+b.dataset.t));
+
+function resize(){const r=stage.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.setViewOffset(r.width,r.height,0,-r.height*0.1,r.width,r.height);camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage); resize();
+setup(); clue(2);
+renderer.setAnimationLoop(()=>{controls.update();
+ pieces.forEach(p=>{p.group.position.lerp(p.target,.35);if(p.bounce>0){p.bounce=Math.max(0,p.bounce-.08);const s=1+Math.sin(p.bounce*Math.PI)*.06;p.group.scale.set(s,1/s,s);}});
+ renderer.render(scene,camera);});
+</script>
+</body>
+</html>

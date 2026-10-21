@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>게임 화면 v4</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<style>
+:root{--ink:#2A1A5E;--purple:#4B2A9A;--purple-2:#6A44C9;--gold-1:#FFF1A6;--gold-2:#FFC529;--gold-3:#F29B00;--gold-edge:#B4690A;--cream:#FFF8E8;--chip:rgba(36,22,74,.72)}
+*{box-sizing:border-box}
+body{margin:0;background:#17112E;color:#fff;font-family:Pretendard,system-ui,sans-serif;padding:28px 20px 60px}
+.page{max-width:1120px;margin:0 auto}
+.page>h1{font-family:Jua;font-weight:400;margin:0 0 4px;font-size:28px}
+.page>p{margin:0 0 20px;color:#C9C2E8;line-height:1.6}
+.stage{position:relative;width:100%;aspect-ratio:16/10;border-radius:22px;overflow:hidden;container-type:inline-size;box-shadow:0 20px 50px rgba(0,0,0,.5);user-select:none}
+.bg{position:absolute;inset:0;background:url(/files/game-bg-v4.png) center/cover;filter:saturate(1.05)}
+#c{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.chip{display:inline-flex;align-items:center;gap:.6cqw;background:var(--chip);backdrop-filter:blur(6px);border-radius:999px;padding:.7cqw 1.4cqw;font-weight:700;font-size:1.3cqw;color:#fff;border:1px solid rgba(255,255,255,.18)}
+.chip i{width:.8cqw;height:.8cqw;border-radius:50%;background:#5EE1FF;display:inline-block}
+.chip svg{width:1.6cqw;height:1.6cqw}
+.combo{background:linear-gradient(180deg,#FF8A3D,#E8430F);border-color:#FFD2A8}
+.hud{position:absolute;left:2%;top:2.4%;display:flex;gap:.8cqw}
+.island{position:absolute;left:2%;top:10.5%;display:flex;align-items:center;gap:.8cqw;padding:.5cqw 1.2cqw .5cqw .5cqw;border-radius:999px;background:var(--chip);border:1px solid rgba(255,255,255,.22)}
+.island img{width:4.2cqw;height:4.2cqw;border-radius:50%;object-fit:cover;border:.25cqw solid #C9A2FF}
+.island small{display:block;font-size:1cqw;color:#C9C2E8;font-weight:700}
+.island b{display:block;font-family:Jua;font-weight:400;font-size:1.5cqw;color:#FFE27A}
+.bar{width:9cqw;height:.9cqw;margin-top:.3cqw;border-radius:999px;background:rgba(255,255,255,.15);overflow:hidden;border:1px solid rgba(255,255,255,.3)}
+.bar i{display:block;height:100%;width:55%;background:linear-gradient(90deg,#7CF3FF,#FFE27A)}
+.mission{position:absolute;left:25%;right:25%;top:2.6%;text-align:center}
+.mission span{display:inline-block;font-family:Jua;font-size:2.6cqw;color:#fff;background:rgba(36,22,74,.72);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:.6cqw 2.4cqw;text-shadow:0 .2cqw 0 rgba(0,0,0,.3)}
+.score{position:absolute;right:2%;top:2.4%;display:flex;align-items:center;gap:.8cqw;background:var(--chip);border-radius:999px;padding:.5cqw .6cqw .5cqw 1.4cqw;border:1px solid rgba(255,255,255,.2)}
+.score small{font-weight:700;font-size:1.2cqw;color:#C9C2E8}
+.score b{font-family:Jua;font-weight:400;font-size:2.4cqw;color:#FFE27A;font-variant-numeric:tabular-nums;background:rgba(0,0,0,.25);border-radius:999px;padding:0 1.2cqw}
+.clue{position:absolute;right:2%;top:11%;width:18%;border-radius:1.4cqw;background:rgba(255,248,232,.96);border:.35cqw solid #F3C24E;box-shadow:0 .8cqw 0 #A86A12,0 1.2cqw 2.4cqw rgba(0,0,0,.35);padding:1cqw;color:var(--ink)}
+.clue h3{margin:0 0 .6cqw;font-family:Jua;font-weight:400;font-size:1.6cqw;text-align:center;color:var(--purple)}
+.ctabs{display:grid;grid-template-columns:1fr 1fr;gap:.4cqw;margin-bottom:.8cqw}
+.ctabs button{border:0;border-radius:.8cqw;padding:.5cqw 0;font:700 1.05cqw Pretendard;background:#EFE6D2;color:#6B5B8C;cursor:pointer}
+.ctabs button.on{background:linear-gradient(180deg,var(--purple-2),var(--purple));color:#fff}
+.g{display:grid;gap:.3cqw;justify-content:center}
+.g div{width:2.3cqw;height:2.3cqw;border-radius:.4cqw;background:#E9DFC9;display:flex;align-items:center;justify-content:center;font-family:Jua;font-size:1.4cqw;color:#7A3B00}
+.g .f{background:linear-gradient(180deg,#FFD27A,#FFAA3B);box-shadow:inset 0 -.25cqw 0 rgba(160,70,0,.35)}
+.cap{font-size:1cqw;color:#7A6E95;text-align:center;margin:.3cqw 0 .7cqw;font-weight:700}
+.views{display:grid;grid-template-columns:auto auto;grid-template-areas:"top ." "front side";gap:.4cqw 1cqw;justify-content:center;align-items:end}
+.views>div{text-align:center}.views .g div{width:2cqw;height:2cqw}.views .cap{margin:.2cqw 0 0}
+.tools{position:absolute;right:2%;bottom:3%;display:flex;gap:.8cqw}
+.tool{display:flex;flex-direction:column;align-items:center;gap:.2cqw;width:6.2cqw;padding:.7cqw 0;border-radius:1.2cqw;background:var(--chip);border:1px solid rgba(255,255,255,.22);color:#fff;font:700 1cqw Pretendard;cursor:pointer}
+.tool svg{width:2.2cqw;height:2.2cqw}
+#ring{position:absolute;width:0;height:0;display:none;z-index:5}
+#ring button{position:absolute;transform:translate(-50%,-50%);width:5.4cqw;height:5.4cqw;border-radius:50%;cursor:pointer;color:#5A2C00;background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 50%,var(--gold-3));border:.3cqw solid #FFF4B8;box-shadow:0 .5cqw 0 var(--gold-edge),0 .9cqw 1.6cqw rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
+#ring button svg{width:2.6cqw;height:2.6cqw}
+#ring small{position:absolute;transform:translate(-50%,0);font-family:Jua;font-size:1.2cqw;color:#fff;background:rgba(36,22,74,.85);border-radius:.6cqw;padding:.1cqw .7cqw;white-space:nowrap}
+.lg{position:relative;display:block;font-family:Jua;font-weight:400;font-size:8cqw}
+.lg::before{content:attr(data-t);position:absolute;left:0;right:0;top:0;color:#2B1263;-webkit-text-stroke:1.5cqw #2B1263;text-shadow:0 1.1cqw 0 #2B1263;z-index:0}
+.lg span{position:relative;z-index:1;background:linear-gradient(180deg,#FFFBD6,#FFE15C 40%,#FFB300 70%,#FF8A00);-webkit-background-clip:text;background-clip:text;color:transparent}
+#solved{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%) scale(.6);opacity:0;transition:all .3s cubic-bezier(.3,1.6,.5,1);pointer-events:none;z-index:6}
+#solved.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+ <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></symbol>
+ <symbol id="i-stand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="m7 8 5-4 5 4"/><path d="m7 16 5 4 5-4"/></symbol>
+ <symbol id="i-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="m16 7 4 5-4 5"/><path d="m8 7-4 5 4 5"/></symbol>
+ <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a2 2 0 0 1 2-2h2l2-3h6l2 3h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3"/></symbol>
+ <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+ <symbol id="i-skip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/></symbol>
+ <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+ <symbol id="i-flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3.5 4.5 5.5 5.6 9.2A6.6 6.6 0 0 1 12 22a6.6 6.6 0 0 1-6.4-8.3c.5-1.9 1.8-3 2.4-4.6.4 1.6 1.1 2.7 2.3 3.3C10.1 9 10.6 5.3 12 2z"/></symbol>
+</defs></svg>
+
+<div class="page">
+<h1>게임 화면 v4</h1>
+<p>그림 배경을 그대로 두고, 3D 카메라를 그림 속 원형 작업대의 시야각에 맞췄습니다. 화면을 돌리면 카메라 대신 작업대 위의 판과 조각이 회전판처럼 돌아서, 시야각이 배경과 어긋나지 않습니다.</p>
+
+<div class="stage" id="gameStage">
+ <div class="bg"></div>
+ <canvas id="c"></canvas>
+ <div class="hud"><span class="chip"><i></i>3단계 · 층별 단서</span><span class="chip combo"><svg><use href="#i-flame"/></svg>4연속 ×2</span></div>
+ <div class="island"><img src="/files/island-2.png" alt="내 섬"><div><small>내 섬 · 다음 단계까지 3문제</small><b>블록 오두막</b><div class="bar"><i></i></div></div></div>
+ <div class="mission"><span>이 모양을 똑같이 쌓아요!</span></div>
+ <div class="score"><small>점수</small><b id="score">1,240</b></div>
+ <div class="clue"><h3>단서 카드</h3>
+  <div class="ctabs"><button data-t="0">3D 모양</button><button data-t="1">위+수</button><button data-t="2">층별</button><button data-t="3">위·앞·옆</button></div>
+  <div id="clueBody"></div>
+ </div>
+ <div class="tools">
+  <button class="tool" id="resetView"><svg><use href="#i-camera"/></svg>처음 시점</button>
+  <button class="tool" id="restart"><svg><use href="#i-undo"/></svg>다시 놓기</button>
+  <button class="tool"><svg><use href="#i-skip"/></svg>건너뛰기</button>
+  <button class="tool"><svg><use href="#i-help"/></svg>도움말</button>
+ </div>
+ <div id="ring">
+  <button data-r="y" style="left:0;top:-7.5cqw" aria-label="돌리기"><svg><use href="#i-rotate"/></svg></button><small style="left:0;top:-4.6cqw">돌리기</small>
+  <button data-r="x" style="left:-7cqw;top:3cqw" aria-label="세우기"><svg><use href="#i-stand"/></svg></button><small style="left:-7cqw;top:6cqw">세우기</small>
+  <button data-r="z" style="left:7cqw;top:3cqw" aria-label="뒤집기"><svg><use href="#i-flip"/></svg></button><small style="left:7cqw;top:6cqw">뒤집기</small>
+ </div>
+ <div id="solved"><span class="lg" data-t="완성!"><span>완성!</span></span></div>
+</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+// ── 배경 그림 속 원형 작업대 (이미지 픽셀 기준, 금테 안쪽 돌바닥) ──
+const BG={w:1344,h:768,cx:672,cy:418,a:440,b:250};
+const R=6;                      // 3D에서 작업대 반지름
+const PITCH=Math.asin(BG.b/BG.a); // 그림의 타원 비율 → 내려다보는 각도
+const FOV=22;                   // 좁은 화각 = 그림처럼 원근 왜곡이 적게
+
+// ── 문제 ──
+const HEIGHTS=[[2,2,2,1],[2,1,1,1]];
+const TARGET=[];HEIGHTS.forEach((r,z)=>r.forEach((h,x)=>{for(let y=0;y<h;y++)TARGET.push([x,y,z]);}));
+const key=c=>c.join(','),TSET=new Set(TARGET.map(key));
+const BW=4,BD=2,BC=new THREE.Vector2(BW/2,BD/2);
+const DEFS=[
+ {color:0x3B9BFF,cells:[[0,0,0],[0,1,0],[0,1,1],[1,0,0]]},
+ {color:0x3DD47A,cells:[[0,0,0],[1,0,0],[2,0,0],[3,0,0]]},
+ {color:0xFF8A2B,cells:[[0,1,0],[1,1,0],[1,0,0],[2,0,0]]},
+];
+const START_ANG=[180,90,0], START_R=3.9;   // 왼쪽 · 앞 · 오른쪽에 가지런히
+
+const stage=document.getElementById('gameStage'),canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(FOV,16/10,.1,500);
+
+// 빛: 그림처럼 오른쪽 위에서 오는 따뜻한 빛
+scene.add(new THREE.HemisphereLight(0xFFF4E0,0xC9A57A,1.15));
+const sun=new THREE.DirectionalLight(0xFFE6C0,2.3);sun.position.set(7,14,-5);sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8,near:1,far:40});sun.shadow.bias=-.0008;sun.shadow.radius=4;scene.add(sun);
+
+// 그림 위에 그림자만 받는 투명 바닥
+const catcher=new THREE.Mesh(new THREE.CircleGeometry(R+.2,64),new THREE.ShadowMaterial({opacity:.28}));
+catcher.rotation.x=-Math.PI/2;catcher.receiveShadow=true;scene.add(catcher);
+
+// 회전판: 화면을 돌리면 이 그룹이 돈다 (카메라는 그림 시점에 고정)
+const turntable=new THREE.Group();scene.add(turntable);
+const grid=new THREE.Group();grid.position.set(-BC.x,0,-BC.y);turntable.add(grid);
+
+// 판
+const frame=new THREE.Mesh(new RoundedBoxGeometry(BW+.7,.16,BD+.7,3,.08),new THREE.MeshStandardMaterial({color:0x5A35B5,roughness:.45}));
+frame.position.set(BC.x,0,BC.y);frame.receiveShadow=true;frame.castShadow=true;grid.add(frame);
+const ftrim=new THREE.Mesh(new RoundedBoxGeometry(BW+.86,.08,BD+.86,3,.04),new THREE.MeshStandardMaterial({color:0xF2B93B,metalness:.5,roughness:.35}));ftrim.position.set(BC.x,-.04,BC.y);grid.add(ftrim);
+const tileGeo=new RoundedBoxGeometry(.94,.06,.94,2,.03),tileMat=new THREE.MeshStandardMaterial({color:0xFFF3D6,roughness:.7});
+HEIGHTS.forEach((r,z)=>r.forEach((h,x)=>{const t=new THREE.Mesh(tileGeo,tileMat);t.position.set(x+.5,.06,z+.5);t.receiveShadow=true;grid.add(t);}));
+{const cv=document.createElement('canvas');cv.width=256;cv.height=128;const g=cv.getContext('2d');g.fillStyle='#F2B93B';g.beginPath();g.roundRect(8,8,240,112,56);g.fill();g.fillStyle='#3A1E7A';g.font='bold 80px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('앞',128,70);
+ const lab=new THREE.Mesh(new THREE.PlaneGeometry(1.1,.55),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv),transparent:true,toneMapped:false}));lab.rotation.x=-Math.PI/2;lab.position.set(BC.x,.1,BD+.75);grid.add(lab);}
+
+// 목표 모양
+const ghost=new THREE.Group(),gg=new RoundedBoxGeometry(.92,.92,.92,2,.08);
+const gmat=new THREE.MeshStandardMaterial({color:0x8FEFFF,emissive:0x2FC8F0,emissiveIntensity:.7,transparent:true,opacity:.45,depthWrite:false});
+TARGET.forEach(([x,y,z])=>{const m=new THREE.Mesh(gg,gmat);m.position.set(x+.5,y+.53,z+.5);ghost.add(m);});grid.add(ghost);
+
+// 조각 (쌓기나무 사이 틈이 거의 없게)
+const ROT={y:([x,y,z])=>[z,y,-x],x:([x,y,z])=>[x,-z,y],z:([x,y,z])=>[-y,x,z]};
+const norm=cs=>{const m=[0,1,2].map(i=>Math.min(...cs.map(c=>c[i])));return cs.map(c=>c.map((v,i)=>v-m[i]));};
+const dims=cs=>[0,1,2].map(i=>Math.max(...cs.map(c=>c[i]))+1);
+// 가장 낮게 눕힌 방향 + 한 번 돌려 둔 방향으로 시작 (정답 그대로가 아니게)
+function lieFlat(cs){let best=norm(cs),bh=dims(best)[1];const seqs=[[],['x'],['z'],['x','x'],['z','z'],['x','y'],['z','y']];
+ for(const s of seqs){let c=norm(cs);s.forEach(a=>c=norm(c.map(ROT[a])));const h=dims(c)[1];if(h<bh){bh=h;best=c;}}return norm(best.map(ROT.y));}
+const cubeGeo=new RoundedBoxGeometry(.995,.995,.995,2,.05);
+let pieces=[],solved=false;
+function build(p){p.group.clear();p.cells.forEach(c=>{const m=new THREE.Mesh(cubeGeo,p.mat);m.position.set(c[0]+.5,c[1]+.5,c[2]+.5);m.castShadow=true;m.receiveShadow=true;m.userData.piece=p;p.group.add(m);});}
+function occ(p){const s=new Set();pieces.forEach(q=>{if(q!==p)q.cells.forEach(c=>s.add(key([c[0]+q.pos[0],c[1]+q.pos[1],c[2]+q.pos[2]])));});return s;}
+function drop(p){const o=occ(p);for(let y=0;y<12;y++){if(p.cells.every(c=>!o.has(key([c[0]+p.pos[0],c[1]+y,c[2]+p.pos[2]])))){p.pos[1]=y;break;}}p.target=new THREE.Vector3(...p.pos);}
+// 작업대 안에 있는가: 조각의 모든 칸 모서리가 원 안쪽
+function fits(cells,x,z){return cells.every(c=>[[0,0],[1,0],[0,1],[1,1]].every(([u,v])=>Math.hypot(x+c[0]+u-BC.x,z+c[2]+v-BC.y)<=R-.15));}
+function clampIn(p){let n=0;while(!fits(p.cells,p.pos[0],p.pos[2])&&n++<20){const [w,,d]=dims(p.cells);const dx=BC.x-(p.pos[0]+w/2),dz=BC.y-(p.pos[2]+d/2);
+ if(Math.abs(dx)>=Math.abs(dz))p.pos[0]+=Math.sign(dx);else p.pos[2]+=Math.sign(dz);}}
+function rotate(p,a){p.cells=norm(p.cells.map(ROT[a]));clampIn(p);build(p);drop(p);p.group.position.copy(p.target);p.bounce=1;check();}
+function setup(){pieces.forEach(p=>grid.remove(p.group));solved=false;document.getElementById('solved').classList.remove('on');turntable.rotation.y=0;
+ pieces=DEFS.map((d,i)=>{let cells=lieFlat(d.cells);{const [w0,,d0]=dims(cells);const radialZ=Math.abs(Math.sin(START_ANG[i]*Math.PI/180))>.7;if(radialZ?d0>w0:w0>d0)cells=norm(cells.map(ROT.y));}const [w,,dd]=dims(cells);const a=START_ANG[i]*Math.PI/180;
+  const p={cells,pos:[Math.round(BC.x+Math.cos(a)*START_R-w/2),0,Math.round(BC.y+Math.sin(a)*START_R-dd/2)],mat:new THREE.MeshStandardMaterial({color:d.color,roughness:.32}),group:new THREE.Group(),bounce:0};
+  build(p);grid.add(p.group);return p;});
+ placeStarts();pieces.forEach(p=>{drop(p);p.group.position.copy(p.target);});}
+// 시작 위치: 판(+1칸 여유)·다른 조각과 겹치지 않고 작업대 안에 들어오는 칸 중, 목표 각도 위치에 가장 가까운 곳
+function placeStarts(){const taken=new Set();for(let x=-1;x<=BW;x++)for(let z=-1;z<=BD;z++)taken.add(x+','+z);
+ pieces.forEach((p,i)=>{const [w,,d]=dims(p.cells),a=START_ANG[i]*Math.PI/180;
+  const gx=BC.x+Math.cos(a)*START_R-w/2,gz=BC.y+Math.sin(a)*START_R-d/2;let best=null,bd=1e9;
+  for(let x=-8;x<=12;x++)for(let z=-8;z<=10;z++){if(!fits(p.cells,x,z))continue;
+   let ok=true;for(let i2=x-1;i2<=x+w&&ok;i2++)for(let k=z-1;k<=z+d;k++)if(taken.has(i2+','+k)&&(i2>=x&&i2<x+w&&k>=z&&k<z+d)){ok=false;break;}
+   if(!ok)continue;const dd=Math.hypot(x-gx,z-gz);if(dd<bd){bd=dd;best=[x,z];}}
+  p.pos=[best[0],0,best[1]];for(let x=best[0]-1;x<=best[0]+w;x++)for(let z=best[1]-1;z<=best[1]+d;z++)taken.add(x+','+z);});}
+function check(){if(solved)return;const all=new Set();pieces.forEach(q=>q.cells.forEach(c=>all.add(key([c[0]+q.pos[0],c[1]+q.pos[1],c[2]+q.pos[2]]))));
+ if(all.size!==TSET.size)return;for(const k of all)if(!TSET.has(k))return;solved=true;document.getElementById('solved').classList.add('on');document.getElementById('score').textContent=(1240+268).toLocaleString();}
+
+// ── 카메라를 그림의 작업대에 맞추기 (화면 크기가 바뀔 때마다) ──
+function fit(){const r=stage.getBoundingClientRect(),W=r.width,H=r.height;
+ renderer.setSize(W,H,false);camera.aspect=W/H;
+ const s=Math.max(W/BG.w,H/BG.h),ox=(W-BG.w*s)/2,oy=(H-BG.h*s)/2;     // background-size:cover, center
+ const cx=ox+BG.cx*s,cy=oy+BG.cy*s,a=BG.a*s;
+ const f=(H/2)/Math.tan(FOV*Math.PI/360);                              // 초점거리(px)
+ const b=BG.b*s;let D=R*f/a,pitch=PITCH,offY=H/2-cy;
+ // 원근 때문에 원의 앞쪽이 커 보이므로, 투영된 타원의 위·아래·좌우 끝이 그림과 맞을 때까지 몇 번 보정
+ const pr=v=>{const q=v.clone().project(camera);return [(q.x+1)/2*W,(1-q.y)/2*H];};
+ for(let i=0;i<6;i++){
+  camera.position.set(0,D*Math.sin(pitch),D*Math.cos(pitch));camera.lookAt(0,0,0);
+  camera.setViewOffset(W,H,W/2-cx,offY,W,H);camera.updateProjectionMatrix();camera.updateMatrixWorld();
+  const tp=pr(new THREE.Vector3(0,0,-R)),bt=pr(new THREE.Vector3(0,0,R)),lf=pr(new THREE.Vector3(-R,0,0)),rt=pr(new THREE.Vector3(R,0,0));
+  const ha=(rt[0]-lf[0])/2,hb=(bt[1]-tp[1])/2,mid=(bt[1]+tp[1])/2;
+  D*=ha/a; pitch=Math.asin(Math.min(.99,Math.sin(pitch)*b/hb)); offY+=mid-cy;
+ }}
+new ResizeObserver(fit).observe(stage);fit();
+
+// ── 입력 ──
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),floor=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+const ringEl=document.getElementById('ring');let drag=null,spin=null,timer=null,selected=null;const ptrs=new Map();
+function aim(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);}
+function localPt(e){aim(e);const v=new THREE.Vector3();if(!ray.ray.intersectPlane(floor,v))return null;return grid.worldToLocal(v);}
+function sel(p){pieces.forEach(q=>q.mat.emissive.setHex(0));selected=p;if(p)p.mat.emissive.setHex(0x3a2a00);}
+function showRing(e){const r=stage.getBoundingClientRect();ringEl.style.left=Math.min(Math.max(e.clientX-r.left,r.width*.12),r.width*.86)+'px';ringEl.style.top=Math.min(Math.max(e.clientY-r.top,r.height*.2),r.height*.78)+'px';ringEl.style.display='block';}
+function hideRing(){ringEl.style.display='none';}
+canvas.addEventListener('pointerdown',e=>{ptrs.set(e.pointerId,e);canvas.setPointerCapture(e.pointerId);hideRing();
+ if(ptrs.size>1){drag=null;clearTimeout(timer);spin={x:avgX()};return;}
+ aim(e);const hit=ray.intersectObjects(pieces.flatMap(p=>p.group.children))[0];
+ if(!hit){sel(null);spin={x:e.clientX};return;}                       // 빈 곳 → 회전판 돌리기
+ const p=hit.object.userData.piece,f=localPt(e);sel(p);
+ drag={p,sx:e.clientX,sy:e.clientY,moved:false,off:f?[f.x-p.pos[0],f.z-p.pos[2]]:[0,0]};
+ timer=setTimeout(()=>{if(drag&&!drag.moved)showRing(e);},450);});
+function avgX(){let s=0;ptrs.forEach(p=>s+=p.clientX);return s/ptrs.size;}
+canvas.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,e);
+ if(spin){const x=ptrs.size>1?avgX():e.clientX;turntable.rotation.y+=(x-spin.x)*.008;spin.x=x;return;}
+ if(!drag)return;if(!drag.moved&&Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<8)return;
+ drag.moved=true;clearTimeout(timer);const f=localPt(e);if(!f)return;const p=drag.p;
+ p.pos[0]=Math.round(f.x-drag.off[0]);p.pos[2]=Math.round(f.z-drag.off[1]);clampIn(p);p.pos[1]=0;drop(p);p.target.y+=.35;});
+function up(e){ptrs.delete(e.pointerId);if(drag){clearTimeout(timer);if(!drag.moved)showRing(e);else{drop(drag.p);drag.p.bounce=1;check();}}
+ drag=null;if(ptrs.size===0)spin=null;else spin={x:avgX()};}
+canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+ringEl.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{if(selected)rotate(selected,b.dataset.r);}));
+document.getElementById('resetView').onclick=()=>{turntable.rotation.y=0;};
+document.getElementById('restart').onclick=()=>{hideRing();sel(null);setup();};
+
+// ── 단서 카드 ──
+const cell=(n,f)=>`<div class="${f?'f':''}">${n??''}</div>`;
+const gridH=(rows,w)=>`<div class="g" style="grid-template-columns:repeat(${rows[0].length},${w||'2.3cqw'})">${rows.flat().join('')}</div>`;
+function clue(t){ghost.visible=t===0;
+ const tp=HEIGHTS.map(r=>r.map(h=>cell(h,h>0))),layer=L=>HEIGHTS.map(r=>r.map(h=>cell('',h>L)));
+ const front=[1,0].map(L=>HEIGHTS[0].map((_,x)=>cell('',Math.max(...HEIGHTS.map(r=>r[x]))>L)));
+ const side=[1,0].map(L=>HEIGHTS.map(r=>cell('',Math.max(...r)>L)));
+ document.getElementById('clueBody').innerHTML=[
+  `<div class="cap" style="font-size:1.2cqw">판 위에 빛나는 모양을<br>그대로 채워요</div>`,
+  gridH(tp)+`<div class="cap">위에서 본 모양 · 수 = 쌓인 개수</div>`,
+  gridH(layer(0))+`<div class="cap">1층</div>`+gridH(layer(1))+`<div class="cap">2층</div>`,
+  `<div class="views"><div style="grid-area:top">${gridH(tp.map(r=>r.map(()=>cell('',1))),'2cqw')}<div class="cap">위</div></div><div style="grid-area:front">${gridH(front,'2cqw')}<div class="cap">앞</div></div><div style="grid-area:side">${gridH(side,'2cqw')}<div class="cap">옆</div></div></div>`][t];
+ document.querySelectorAll('.ctabs button').forEach(b=>b.classList.toggle('on',+b.dataset.t===t));}
+document.querySelectorAll('.ctabs button').forEach(b=>b.onclick=()=>clue(+b.dataset.t));
+
+setup();clue(0);
+const clock=new THREE.Clock();
+renderer.setAnimationLoop(()=>{const t=clock.getElapsedTime();gmat.opacity=.42+Math.sin(t*2.4)*.1;
+ pieces.forEach(p=>{p.group.position.lerp(p.target,.35);if(p.bounce>0){p.bounce=Math.max(0,p.bounce-.08);const s=1+Math.sin(p.bounce*Math.PI)*.06;p.group.scale.set(s,1/s,s);}});
+ renderer.render(scene,camera);});
+</script>
+</body>
+</html>
