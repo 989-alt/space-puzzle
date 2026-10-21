@@ -81,11 +81,11 @@ function allSpots(cells, center, goal) {
   return { cols, all: found };
 }
 
-// 금지 칸을 피한 후보 자리 중 앞에서부터 limit 개
-function spotsFor(cached, forbidden, limit) {
+// 금지 칸(blocked: "x,z" -> 막은 수)을 피한 후보 자리 중 앞에서부터 limit 개
+function spotsFor(cached, blocked, limit) {
   const spots = [];
   for (const s of cached.all) {
-    if (s.keys.some((k) => forbidden.has(k))) continue;
+    if (s.keys.some((k) => blocked.get(k) > 0)) continue;
     spots.push(s);
     if (spots.length >= limit) break;
   }
@@ -149,11 +149,20 @@ export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceC
   // 처음 찾은 배치(각 조각이 가장 가까운 자리)에서 멈추지 않고, 노드 한도 안에서 비용 합
   // (목표까지 거리 + 방향 벌점)이 더 작은 배치를 계속 찾는다(가지치기). 조각이 많아 자리가
   // 빠듯할 때 한 조각이 엉뚱한 쪽으로 밀려나는 일을 줄인다.
+  // 금지 칸은 셈(Map)으로 두고 조각을 놓을 때 더했다가 되돌아올 때 뺀다(마디마다 집합을 복사하지 않는다).
+  const blocked = new Map();
+  const ringKeys = (cols) => {
+    const out = [];
+    for (const [cx, cz] of cols) {
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) out.push(`${cx + a},${cz + b}`);
+    }
+    return out;
+  };
   let nodes = 0;
   const chosen = [];
   let best = null;
   let bestCost = Infinity;
-  function place(i, forbidden, cost = 0) {
+  function place(i, cost = 0) {
     if (cost >= bestCost) return false;
     if (i === n) {
       best = chosen.slice(0, n);
@@ -166,7 +175,7 @@ export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceC
     const cands = [];
     for (let v = 0; v < list.length; v++) {
       const { cols } = spots[v];
-      for (const s of spotsFor(spots[v], forbidden, SPOTS_PER_VARIANT)) {
+      for (const s of spotsFor(spots[v], blocked, SPOTS_PER_VARIANT)) {
         cands.push({ cells: list[v], cols, x: s.x, z: s.z, cost: s.dist + VARIANT_PENALTY * v });
       }
     }
@@ -177,19 +186,23 @@ export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceC
       const add = back ? 0 : c.cost;
       if (cost + add >= bestCost) break; // 정렬돼 있으니 뒤는 더 비싸다
       if (++nodes > NODE_LIMIT) return false;
-      const next = new Set(forbidden);
-      addWithRing(next, c.cols.map(([cx, cz]) => [c.x + cx, c.z + cz]));
+      const keys = ringKeys(c.cols.map(([cx, cz]) => [c.x + cx, c.z + cz]));
+      for (const k of keys) blocked.set(k, (blocked.get(k) || 0) + 1);
       chosen[i] = { cells: c.cells, x: c.x, z: c.z };
-      place(i + 1, next, cost + add);
+      place(i + 1, cost + add);
+      for (const k of keys) blocked.set(k, blocked.get(k) - 1);
     }
     return false;
   }
 
-  place(0, withLabel);
-  if (!best) {
+  const search = (start) => {
+    blocked.clear();
+    for (const k of start) blocked.set(k, 1);
     nodes = 0;
-    place(0, base);
-  }
+    place(0);
+  };
+  search(withLabel);
+  if (!best) search(base);
   if (!best && avoid && avoid.size) return placeStarts(pieceCellsList, fp, rng, angles);
   if (!best) {
     const cnt = pieceCellsList.map((c) => c.length).join('+');
