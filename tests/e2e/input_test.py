@@ -84,6 +84,7 @@ def open_page(ctx, mode):
     page.wait_for_function("window.__ck.input", timeout=5000)
     page.evaluate("""() => { window.__types = []; window.__lastPointerId = 1;
         document.getElementById('c').addEventListener('pointerdown', (e) => {
+          if (!e.isTrusted) return; // 시험이 넣은 가짜(유령) 포인터는 세지 않는다
           window.__types.push(e.pointerType); window.__lastPointerId = e.pointerId; }, true); }""")
     page.wait_for_timeout(600)
     cdp = ctx.new_cdp_session(page) if mode == "touch" else None
@@ -282,10 +283,51 @@ def right_button_ignored(page, ptr):
     assert pieces(page)[0]["pos"] == before and page.evaluate("__ck.spin()") == 0
 
 
+def ghost_down(page, x, y, pid, ptype):
+    """떼기 없이 남는 유령 pointerdown(놓친 pointerup 흉내)."""
+    page.evaluate(f"""() => document.getElementById('c').dispatchEvent(new PointerEvent('pointerdown',
+        {{ pointerId: {pid}, pointerType: '{ptype}', clientX: {x}, clientY: {y}, button: 0, buttons: 1,
+           isPrimary: true, bubbles: true }}))""")
+
+
+def ghost_pointer_then_drag_moves(page, ptr):
+    """유령 포인터가 남아 있어도 새 끌기는 조각을 옮긴다(두 손가락 회전으로 빠지지 않는다).
+    마우스: 새 마우스 pointerdown 이 남은 포인터를 비운다. 터치: 2초 넘게 움직임 없는 포인터는 버린다."""
+    e = empty_spot(page)
+    if ptr.mode == "mouse":
+        ghost_down(page, e[0], e[1], 7, "touch")
+    else:
+        ghost_down(page, e[0], e[1], 77, "touch")
+        page.wait_for_timeout(2200)
+    before = pieces(page)[0]["pos"]
+    a = xy(page, 0)
+    ptr.drag(a, (a[0] + 120, a[1]))
+    page.wait_for_timeout(300)
+    assert page.evaluate("__ck.spin()") == 0, f"spun {page.evaluate('__ck.spin()')}"
+    assert pieces(page)[0]["pos"] != before, "piece did not move"
+    assert is_int(target_y(page, 0))
+
+
+def ghost_mouse_hover_does_not_spin(page, ptr):
+    """마우스 전용: 놓친 떼기로 남은 마우스 포인터는 버튼 없는 이동(buttons 0)에서 버린다."""
+    e = empty_spot(page)
+    ghost_down(page, e[0], e[1], 1, "mouse")
+    page.mouse.move(e[0], e[1])
+    page.mouse.move(e[0] + 150, e[1], steps=10)
+    page.wait_for_timeout(100)
+    assert page.evaluate("__ck.spin()") == 0, f"hover spun {page.evaluate('__ck.spin()')}"
+    a = xy(page, 0)
+    before = pieces(page)[0]["pos"]
+    ptr.drag(a, (a[0] + 120, a[1]))
+    page.wait_for_timeout(300)
+    assert pieces(page)[0]["pos"] != before and page.evaluate("__ck.spin()") == 0
+
+
 TESTS = [drag_moves_piece, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
-         long_press_opens_ring, empty_tap_hides_ring, empty_drag_spins, cancel_mid_drag_lands]
+         long_press_opens_ring, empty_tap_hides_ring, empty_drag_spins, cancel_mid_drag_lands,
+         ghost_pointer_then_drag_moves]
 TOUCH_ONLY = [second_finger_lands_then_spins]
-MOUSE_ONLY = [right_button_ignored]
+MOUSE_ONLY = [right_button_ignored, ghost_mouse_hover_does_not_spin]
 
 
 def main():

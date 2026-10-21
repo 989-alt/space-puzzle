@@ -7,6 +7,7 @@ import { movePiece, rotatePiece } from '../core/layout.js';
 const DRAG_PX = 8; // 이보다 많이 움직여야 끌기
 const LONG_MS = 450; // 길게 누르기
 const SPIN_K = 0.008; // 회전판 감도(rad/px)
+const STALE_MS = 2000; // 이만큼 움직임 없는 포인터는 떼기를 놓친 유령으로 보고 버린다
 
 // 링 버튼 배치(링 중심 기준 px). 버튼 56px, 글자는 버튼 아래.
 const BTN = 56;
@@ -85,7 +86,7 @@ export function attachInput({
   const ring = buildRing(doc);
   stage.appendChild(ring);
 
-  const ptrs = new Map(); // pointerId -> {x, y}
+  const ptrs = new Map(); // pointerId -> {x, y, t(마지막 down/move 시각)}
   let drag = null; // {i, id, sx, sy, off:[x,z], moved, longShown}
   let spin = null; // {x, moved}
   let timer = 0;
@@ -153,9 +154,24 @@ export function attachInput({
     hideRing();
   }
 
+  // 떼기(pointerup)를 놓쳐 남은 포인터를 정리한다. 끌던 조각이면 내려놓는다.
+  const drop = (id) => {
+    const p = ptrs.get(id);
+    if (p) release({ pointerId: id, clientX: p.x, clientY: p.y }, false);
+  };
+
   function onDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const now = performance.now();
+    if (e.pointerType === 'mouse') {
+      // 마우스는 하나뿐이다. 새로 누르면 남은 포인터(유령 터치 포함)는 모두 지난 것이다.
+      for (const id of [...ptrs.keys()]) drop(id);
+      ptrs.clear();
+      spin = null;
+    } else {
+      for (const [id, p] of [...ptrs]) if (now - p.t > STALE_MS) drop(id);
+    }
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, t: now });
     try { canvas.setPointerCapture(e.pointerId); } catch { /* 이미 사라진 포인터 */ }
     hideRing();
     if (ptrs.size > 1) {
@@ -184,7 +200,9 @@ export function attachInput({
 
   function onMove(e) {
     if (!ptrs.has(e.pointerId)) return;
-    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // 버튼이 눌려 있지 않은 마우스·펜 이동 = 떼기를 놓친 포인터
+    if (e.pointerType !== 'touch' && e.buttons === 0) { drop(e.pointerId); return; }
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
     if (spin) {
       const x = avgX();
       if (x !== spin.x) {
