@@ -1,4 +1,11 @@
 /* 토큰·글꼴·공통 부품(칩, 금색 버튼, 입체 로고, 금테 카드). 시안 design-v2 / design-v4-game 에서 옮김. */
+/* 글꼴은 저장소에 함께 둔다(학교망에서 외부 CDN 이 막혀도 같은 글꼴, 첫 화면을 막지 않게 swap).
+   Jua: KS X 1001 한글 2350자 + 영문·숫자·쓰는 글자로 줄인 사본(OFL, 예약 이름 없음).
+   Pretendard v1.3.9: 공식 KS X 1001 서브셋 그대로(OFL, 예약 이름 Pretendard). 라이선스는 assets/fonts/OFL-*.txt */
+@font-face{font-family:'Jua';font-style:normal;font-weight:400;font-display:swap;src:url(../assets/fonts/Jua-Regular.subset.woff2) format('woff2')}
+@font-face{font-family:'Pretendard';font-style:normal;font-weight:400;font-display:swap;src:url(../assets/fonts/Pretendard-Regular.subset.woff2) format('woff2')}
+@font-face{font-family:'Pretendard';font-style:normal;font-weight:700;font-display:swap;src:url(../assets/fonts/Pretendard-Bold.subset.woff2) format('woff2')}
+@font-face{font-family:'Pretendard';font-style:normal;font-weight:800;font-display:swap;src:url(../assets/fonts/Pretendard-ExtraBold.subset.woff2) format('woff2')}
 :root{
   --ink:#2A1A5E; --purple:#4B2A9A; --purple-2:#6A44C9;
   --gold-1:#FFF1A6; --gold-2:#FFC529; --gold-3:#F29B00; --gold-edge:#B4690A;

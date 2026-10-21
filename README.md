@@ -74,7 +74,7 @@ python tools/preview-sheet.py     # design/review/puzzles-s1..4.png 미리보기
 2. 작업 브랜치를 `main` 으로 합쳐 푸시합니다. 저장소에는 `index.html`, `src/`, `styles/`, `assets/`, `data/`, `vendor/` 가 있어야 합니다. 시험·시안·문서 폴더는 올려도 동작에는 영향이 없습니다.
 3. 저장소의 Settings → Pages 에서 Source 를 "Deploy from a branch", Branch 를 `main` / `(root)` 로 저장합니다.
 4. 1~2분 뒤 위 주소로 열립니다. 주소는 `/` 로 끝나는 하위 경로라서, 코드의 모든 경로는 `index.html` 기준 상대 경로여야 합니다(현재 그렇게 되어 있습니다).
-5. 배포 후 확인: 시작 화면 → 안내 → 게임 → 정답까지 한 번 돌려 보고, 글꼴(Jua, Pretendard)이 막힌 학교망에서는 시스템 글꼴로 대체되는지 확인합니다.
+5. 배포 후 확인: 시작 화면 → 안내 → 게임 → 정답까지 한 번 돌려 보고, 글꼴(Jua, Pretendard)은 assets/fonts 에 함께 들어 있어 외부 CDN 없이 나오는지 확인합니다(라이선스: assets/fonts/OFL-*.txt).
 6. 학생 검증을 위해 링크를 미리 배포·공유하지 않습니다(재방문 측정이 어려워집니다).
 
 ## 폴더
