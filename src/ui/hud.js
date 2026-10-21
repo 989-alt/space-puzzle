@@ -23,7 +23,7 @@ export function renderHud({ stage = 1, levelName: name, streak = 0, mult = 1, sc
   $('#comboText').textContent = `${streak}연속 ${fmtMult(mult)}`;
   $('#scoreText').textContent = Number(score).toLocaleString('ko-KR');
   const img = $('#islandImg');
-  const src = `assets/img/island-${island + 1}.png`;
+  const src = `assets/img/island-${island + 1}.webp`;
   if (!img.src.endsWith(src)) img.src = src;
   img.alt = `내 섬: ${ISLAND_NAMES[island] ?? ''}`;
   $('#islandName').textContent = ISLAND_NAMES[island] ?? '';

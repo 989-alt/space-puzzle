@@ -116,7 +116,7 @@ function chip(text, cls) {
 
 function islandImg(stage) {
   const img = document.createElement('img');
-  img.src = `assets/img/island-${stage + 1}.png`;
+  img.src = `assets/img/island-${stage + 1}.webp`;
   img.alt = ISLAND_NAMES[stage] ?? '';
   return img;
 }

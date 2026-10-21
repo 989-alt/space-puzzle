@@ -2,7 +2,7 @@
 // 렌더러·DOM 없이 투영만 쓴다(Node 테스트에서도 돈다). addons 는 쓰지 않는다.
 import { Vector3 } from '#three';
 
-// game-bg-v4.png(1344x768) 픽셀 기준 작업대 타원: 중심 (cx, cy), 가로 반지름 a, 세로 반지름 b.
+// game-bg-v4.webp(1344x768) 픽셀 기준 작업대 타원: 중심 (cx, cy), 가로 반지름 a, 세로 반지름 b.
 export const BG = { w: 1344, h: 768, cx: 672, cy: 418, a: 440, b: 250 };
 
 const ITER = 6;

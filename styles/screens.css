@@ -9,7 +9,7 @@
 .frame>*{position:absolute}
 
 /* ① 시작 */
-#screen-title .bg{background-image:url(../assets/img/title-bg.png)}
+#screen-title .bg{background-image:url(../assets/img/title-bg.webp)}
 .t-chip-l{left:2%;top:3%}
 .t-chip-r{right:2%;top:3%}
 .t-chip-r .dot{background:#FFE27A}
@@ -24,7 +24,7 @@
 
 /* ② 조작 안내 */
 #screen-tutorial{z-index:4}
-#screen-tutorial .bg{background-image:url(../assets/img/title-bg.png);filter:blur(3px) brightness(.85);transform:scale(1.05)}
+#screen-tutorial .bg{background-image:url(../assets/img/title-bg.webp);filter:blur(3px) brightness(.85);transform:scale(1.05)}
 #screen-tutorial .shade{position:absolute;inset:0;background:rgba(23,17,46,.25)}
 #screen-tutorial.over-game .bg{display:none}
 #screen-tutorial.over-game .shade{background:rgba(23,17,46,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
@@ -56,7 +56,7 @@
 
 /* ③ 게임 */
 #screen-game{container-type:inline-size}
-#screen-game .bg{background:url(../assets/img/game-bg-v4.png) center/cover;filter:saturate(1.05)}
+#screen-game .bg{background:url(../assets/img/game-bg-v4.webp) center/cover;filter:saturate(1.05)}
 #screen-game canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
 .hud{position:absolute;left:2%;top:2.4%;display:flex;gap:.8cqw;z-index:2}
 .island{position:absolute;left:2%;top:10.5%;display:flex;align-items:center;gap:.8cqw;padding:.5cqw 1.4cqw .5cqw .5cqw;border-radius:999px;
@@ -97,7 +97,7 @@ button.easy{display:flex;width:100%;margin-top:.8cqw;min-height:48px;align-items
   font-size:1.15cqw;line-height:1.2;color:#5A2C00;border:.25cqw solid #FFF4B8;border-radius:1cqw;cursor:pointer;padding:.4cqw .6cqw;
   background:linear-gradient(180deg,var(--gold-1),var(--gold-2) 50%,var(--gold-3));box-shadow:0 .4cqw 0 var(--gold-edge);animation:pop .35s cubic-bezier(.3,1.6,.5,1)}
 button.easy svg{width:1.4cqw;height:1.4cqw;flex:none}
-button.easy[hidden]{display:none}
+button.easy[hidden],.chip[hidden]{display:none}
 @keyframes pop{from{scale:.6;opacity:0}}
 
 .tools{position:absolute;right:2%;bottom:3%;display:flex;gap:.8cqw;z-index:2}
@@ -122,7 +122,7 @@ button.easy[hidden]{display:none}
 
 /* ④ 정답 */
 #screen-win{z-index:3}
-#screen-win .bg{background-image:url(../assets/img/game-bg-v4.png);filter:blur(4px) brightness(.55);transform:scale(1.05)}
+#screen-win .bg{background-image:url(../assets/img/game-bg-v4.webp);filter:blur(4px) brightness(.55);transform:scale(1.05)}
 .rays{position:absolute;left:50%;top:42%;width:150vmax;height:150vmax;transform:translate(-50%,-50%);pointer-events:none;
   background:repeating-conic-gradient(from 0deg,rgba(255,236,150,.55) 0 7deg,transparent 7deg 18deg);
   -webkit-mask:radial-gradient(circle,#000 0 14%,transparent 45%);mask:radial-gradient(circle,#000 0 14%,transparent 45%);animation:spin 18s linear infinite}
