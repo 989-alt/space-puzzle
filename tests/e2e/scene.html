@@ -30,6 +30,7 @@ import * as THREE from '#three';
 import { fitCamera } from '../../src/scene/calibrate.js';
 import { createWorld } from '../../src/scene/world.js';
 import { createRenderer, watchFps } from '../../src/scene/perf.js';
+import { attachInput } from '../../src/scene/input.js';
 import { footprint } from '../../src/core/clues.js';
 import { ISLAND_R, boardCenter, placeStarts, fits } from '../../src/core/layout.js';
 import { dropY, occupiedSet } from '../../src/core/board.js';
@@ -121,7 +122,21 @@ if (!renderer) {
     spin: () => world.getSpin(),
     setSpin: (r) => world.setSpin(r),
     world,
+    // Task 7 입력 확인용
+    drops: 0,
+    rotations: [],
+    selected: null,
+    pieceTargetY: (i) => world.pieceTarget(i)[1],
+    lastRing: () => window.__ck.input.ringState(),
   };
+  window.__ck.input = attachInput({
+    canvas, stage, world,
+    getPieces: () => pieces,
+    setPiece: (i, p) => { pieces[i] = { ...p, color: pieces[i].color }; },
+    onDrop: () => { window.__ck.drops++; },
+    onSelect: (i) => { window.__ck.selected = i; },
+    onRotate: (i, axis) => { window.__ck.rotations.push([i, axis]); },
+  });
 
   if (!qs.has('noPerf')) watchFps(renderer, world, () => { window.__ck.lowMode = true; });
   let last = performance.now();

@@ -256,5 +256,7 @@ export function createWorld(renderer, scene, camera) {
     // 판 좌표 -> 월드 좌표(화면 투영 등에 쓴다)
     toWorld: (x, y, z) => { scene.updateMatrixWorld(); return grid.localToWorld(new THREE.Vector3(x, y, z)); },
     center: () => ({ ...center }),
+    // 조각이 따라가는 목표 위치(판 좌표, 끄는 중이면 띄운 높이 포함). 확인용
+    pieceTarget: (i) => (entries[i] ? entries[i].target.toArray() : null),
   };
 }
