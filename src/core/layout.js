@@ -93,10 +93,14 @@ export function placeStarts(pieceCellsList, fp, rng) {
   const angles = startAngles(n);
   const base = new Set();
   addWithRing(base, [...fp.cells].map((k) => k.split(',').map(Number)));
-  // 판 바로 앞 한 줄(둘레 1칸 다음 줄)도 비운다. 앞 조각이 "앞" 표시를 가리지 않게.
-  // 이 줄까지 비우면 자리가 없는 문제(s4-014 등)는 이 줄 없이 다시 찾는다.
+  // "앞" 표시 바로 앞 통로(둘레 다음 줄부터 작업대 끝까지, 가운데 2~3열)도 비운다.
+  // 앞 조각이 표시를 가리지 않고 왼앞·오른앞으로 비켜 놓인다. 통로까지 비우면 자리가 없는
+  // 문제는 통로 없이 다시 찾는다.
   const withLabel = new Set(base);
-  for (let x = -1; x <= fp.w; x++) withLabel.add(`${x},${fp.d + 1}`);
+  const zEnd = Math.ceil(center.z + ISLAND_R) + 1;
+  for (let x = Math.floor(fp.w / 2) - 1; x <= Math.ceil(fp.w / 2); x++) {
+    for (let z = fp.d + 1; z <= zEnd; z++) withLabel.add(`${x},${z}`);
+  }
 
   // 각 조각의 방향 후보: 정해진 눕힌 방향 -> 긴 변을 반대 축으로 -> 같은 높이의 나머지 방향
   const variants = pieceCellsList.map((src, i) => {

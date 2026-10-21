@@ -20,7 +20,7 @@ function mulberry32(a) {
 
 const bank = [1, 2, 3, 4].flatMap((s) => JSON.parse(readFileSync(new URL(`../data/puzzles-s${s}.json`, import.meta.url), 'utf8')));
 const SEEDS = [1, 7, 20261021];
-const LABEL_ROW_EXEMPT = ['s4-014'];
+const LABEL_EXEMPT = [];
 
 const colsOf = (cells, x, z) => cells.map((c) => [x + c[0], z + c[2]]);
 const near = (a, b) => Math.abs(a[0] - b[0]) <= 1 && Math.abs(a[1] - b[1]) <= 1;
@@ -75,10 +75,12 @@ test('starts never overlap board ring or each other, all fit (all 160 puzzles x 
         assert.ok(fits(s.cells, s.x, s.z, center), `${p.id}#${seed} piece ${i} fits`);
         assert.equal(s.cells.length, p.pieces[i].length, `${p.id} cell count`);
         for (const col of placed[i]) {
-          // 판 바로 앞 한 줄(z = d + 1, x -1..w)은 "앞" 표시 자리라 비워 둔다.
-          // s4-014(5조각, 5x4 판)는 이 줄까지 비우면 놓을 자리가 없어 이 줄을 쓰는 예비 배치로 놓인다.
-          if (!LABEL_ROW_EXEMPT.includes(p.id)) assert.ok(!(col[1] === fp.d + 1 && col[0] >= -1 && col[0] <= fp.w),
-            `${p.id}#${seed} piece ${i} covers the front label row`);
+          // "앞" 표시 바로 앞 통로(z >= d + 1, x 가 floor(w/2)-1 .. ceil(w/2))는 비워 둔다.
+          // LABEL_EXEMPT 문제는 통로까지 비우면 놓을 자리가 없어 통로를 쓰는 예비 배치로 놓인다.
+          if (!LABEL_EXEMPT.includes(p.id)) {
+            assert.ok(!(col[1] >= fp.d + 1 && col[0] >= Math.floor(fp.w / 2) - 1 && col[0] <= Math.ceil(fp.w / 2)),
+              `${p.id}#${seed} piece ${i} blocks the front label corridor`);
+          }
           for (const k of fp.cells) {
             const [bx, bz] = k.split(',').map(Number);
             assert.ok(!near(col, [bx, bz]), `${p.id}#${seed} piece ${i} touches board ring`);
