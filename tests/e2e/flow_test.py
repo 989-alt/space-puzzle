@@ -196,6 +196,48 @@ def easy_hint_after_60s(browser, base):
     ctx.close()
 
 
+def wrong_cubes_marked_only_at_level1(browser, base):
+    ctx, page, errors = open_game(browser, base)
+    page.evaluate(f"__ck.setPuzzle({json.dumps(ALT_PROTO)})")
+    page.wait_for_timeout(200)
+    n_target = len(ALT_PROTO["target"])
+    clean = page.evaluate("[__ck.wrongCubes(), __ck.ghostShown()]")
+    # 조각 0: (0,0,0),(1,0,0)은 목표 위, (1,1,0)은 목표 밖(목표의 2층은 (0,1,0),(1,1,1))
+    page.evaluate(f"__ck.placeAll({json.dumps(ALT_FILL[:1])})")
+    page.wait_for_timeout(300)
+    wrong1 = page.evaluate("__ck.wrongCubes()")
+    shown1 = page.evaluate("__ck.ghostShown()")
+    shot(page, "wrong-cube")
+    # 바르게 고치면 붉은 칸이 없어지고 채운 칸만큼 반투명 칸이 줄어든다.
+    page.evaluate(f"__ck.placeAll({json.dumps([{'cells': [[0, 0, 0], [0, 1, 0], [1, 0, 0]], 'pos': [0, 0, 0]}])})")
+    page.wait_for_timeout(200)
+    wrong2 = page.evaluate("__ck.wrongCubes()")
+    shown2 = page.evaluate("__ck.ghostShown()")
+    # 2단계: 틀리게 놓아도 표시가 없다. 쉬운 단서로 1단계가 되면 바로 나타난다.
+    page.evaluate("__ck.setProgress({stage: 2})")
+    page.evaluate("__ck.setPuzzle('s2-001')")
+    page.wait_for_timeout(200)
+    page.evaluate("__ck.placeAll([{cells: __ck.pieces()[0].cells, pos: [0, 6, 0]}])")
+    page.wait_for_timeout(200)
+    lvl2 = page.evaluate("[__ck.state().level, __ck.wrongCubes(), __ck.ghostShown()]")
+    page.evaluate("__ck.elapsed(61)")
+    page.wait_for_timeout(100)
+    page.click("#easyBtn")
+    page.wait_for_timeout(250)
+    ncells = page.evaluate("__ck.pieces()[0].cells.length")
+    ntarget2 = page.evaluate("__ck.puzzle().target.length")
+    easy = page.evaluate("[__ck.state().level, __ck.wrongCubes(), __ck.ghostShown()]")
+    shot(page, "wrong-cube-easy")
+    check("wrong_cubes_marked_only_at_level1",
+          clean == [[0, 0], n_target] and wrong1[0] == 1 and wrong1[1] == 0 and shown1 == n_target - 2
+          and wrong2 == [0, 0] and shown2 == n_target - 3
+          and lvl2[0] == 2 and sum(lvl2[1]) == 0 and lvl2[2] == 0
+          and easy[0] == 1 and easy[1][0] > 0 and easy[2] == ntarget2 and not errors,
+          f"clean={clean} wrong1={wrong1} shown1={shown1} wrong2={wrong2} shown2={shown2} lvl2={lvl2} "
+          f"easy={easy} errors={errors[:2]}")
+    ctx.close()
+
+
 def skip_lowers_streak(browser, base):
     ctx, page, errors = open_game(browser, base)
     page.evaluate("__ck.setProgress({streak: 3})")
@@ -453,7 +495,7 @@ def main():
             browser = p.chromium.launch(channel="msedge")
             try:
                 for fn in (solve_shows_win_and_scores, two_solves_promote_to_stage2, all_on_board_wrong_shakes,
-                           easy_hint_after_60s, skip_lowers_streak, stage4_alt_shape_accepted, help_keeps_puzzle,
+                           easy_hint_after_60s, wrong_cubes_marked_only_at_level1, skip_lowers_streak, stage4_alt_shape_accepted, help_keeps_puzzle,
                            drag_then_skip_is_safe, load_failure_retry, win_focuses_next, render_skips_when_idle,
                            context_lost_card, old_browser_card, portrait_pauses_timer, easy_space_reserved):
                     try:

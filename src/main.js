@@ -451,6 +451,9 @@ if (E2E) {
     spin: () => world?.getSpin() ?? 0,
     setSpin: (r) => world?.setSpin(r),
     ghostVisible: () => level === 1,
+    // 붉게 칠한 쌓기나무 수(조각별), 지금 보이는 반투명 목표 칸 수 (1단계 단서에서만 0 이상)
+    wrongCubes: () => world?.wrongCubes() ?? [],
+    ghostShown: () => world?.ghostShown() ?? 0,
     // 해답 탐색기의 첫 해답으로 조각을 옮기고 판정한다.
     solveCurrent() {
       const sol = solve(puzzle.target, puzzle.pieces, { limit: 1 }).solutions[0];

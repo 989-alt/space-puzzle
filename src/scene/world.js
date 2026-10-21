@@ -5,6 +5,8 @@ import * as THREE from '#three';
 import { RoundedBoxGeometry } from '#three/addons/geometries/RoundedBoxGeometry.js';
 import { footprint } from '../core/clues.js';
 import { boardCenter, ISLAND_R } from '../core/layout.js';
+import { cellStatus } from '../core/ghost.js';
+import { key } from '../core/pieces.js';
 
 const LIFT = 0.35; // 끄는 중 조각을 띄우는 높이
 const FRAME_PAD = 0.35; // 판 칸 둘레 보라 틀 폭
@@ -13,6 +15,8 @@ const SHAKE_TIME = 0.45; // 판 흔들기(초)
 const PULSE_DT = 1 / 30; // 목표 모양 깜빡임만 있을 때 다시 그리는 간격(초)
 
 const toColor = (c) => new THREE.Color(c);
+const WRONG_COLOR = new THREE.Color('#FF5A5A'); // 목표 밖에 놓인 쌓기나무 색조
+const WRONG_MIX = 0.72; // 조각 색에서 붉은색 쪽으로 섞는 비율(조각 색이 아직 알아볼 만큼만)
 
 export function createWorld(renderer, scene, camera) {
   // 빛: 그림처럼 오른쪽 위에서 오는 따뜻한 빛
@@ -102,7 +106,10 @@ export function createWorld(renderer, scene, camera) {
   grid.add(board, ghost);
 
   let center = { x: 0, z: 0 };
-  let entries = []; // {group, mat, sig, target:Vector3, bounce}
+  let entries = []; // {group, mat, wrongMat, sig, target:Vector3, bounce, cells, pos, lifted, cubes:[{m, c, wrong}]}
+  let puzzleTarget = [];
+  let ghostMeshes = new Map(); // 목표 칸 키 -> 반투명 칸 메시
+  let ghostOn = false; // 1단계 단서(반투명 목표 모양)가 켜져 있다
   let time = 0;
   let shakeT = 0;
 
@@ -115,6 +122,8 @@ export function createWorld(renderer, scene, camera) {
     grid.position.set(-center.x, 0, -center.z);
     clear(board);
     clear(ghost);
+    ghostMeshes = new Map();
+    puzzleTarget = target;
     dirty = true;
     for (const k of fp.cells) {
       const [x, z] = k.split(',').map(Number);
@@ -135,7 +144,42 @@ export function createWorld(renderer, scene, camera) {
       const m = new THREE.Mesh(ghostGeo, ghostMat);
       m.position.set(x + 0.5, y + 0.53, z + 0.5);
       ghost.add(m);
+      ghostMeshes.set(key([x, y, z]), m);
     }
+    updateMarks();
+  }
+
+  // 1단계 단서에서만: 목표 밖에 놓인 쌓기나무는 붉게, 이미 채운 목표 칸의 반투명 칸은 숨긴다.
+  // 끄는 중 띄운 조각은 계산에서 뺀다(놓기 전에는 반투명 칸을 가리거나 붉게 칠하지 않는다).
+  function updateMarks() {
+    let wrongCells = new Set();
+    let filled = new Set();
+    if (ghostOn) {
+      const placed = entries.map((e) => (e.lifted ? { cells: [], pos: e.pos } : { cells: e.cells, pos: e.pos }));
+      ({ wrongCells, filledTargetCells: filled } = cellStatus(placed, puzzleTarget));
+    }
+    let changed = false;
+    for (const e of entries) {
+      for (const cube of e.cubes) {
+        const wrong = ghostOn && !e.lifted
+          && wrongCells.has(key([cube.c[0] + e.pos[0], cube.c[1] + e.pos[1], cube.c[2] + e.pos[2]]));
+        if (wrong !== cube.wrong) {
+          cube.wrong = wrong;
+          cube.m.material = wrong ? e.wrongMat : e.mat;
+          changed = true;
+        }
+      }
+    }
+    for (const [k, m] of ghostMeshes) {
+      const show = !filled.has(k);
+      if (m.visible !== show) { m.visible = show; changed = true; }
+    }
+    if (changed) dirty = true;
+  }
+
+  // 붉게 칠한 쌓기나무용 재질: 조각 색을 붉은색 쪽으로 섞고 약하게 빛나게 한다.
+  function tintWrong(e) {
+    e.wrongMat.color.copy(e.mat.color).lerp(WRONG_COLOR, WRONG_MIX);
   }
 
   const sigOf = (cells) => cells.map((c) => c.join(',')).join(';');
@@ -150,6 +194,8 @@ export function createWorld(renderer, scene, camera) {
     e.pivot.position.set(px, 0, pz);
     e.group.add(e.pivot);
     e.hits = [];
+    e.cubes = [];
+    e.cells = cells;
     for (const c of cells) {
       const m = new THREE.Mesh(cubeGeo, e.mat);
       m.position.set(c[0] + 0.5 - px, c[1] + 0.5, c[2] + 0.5 - pz);
@@ -160,6 +206,7 @@ export function createWorld(renderer, scene, camera) {
       h.userData.pieceIndex = e.index;
       e.pivot.add(m, h);
       e.hits.push(h);
+      e.cubes.push({ m, c, wrong: false });
     }
     e.sig = sigOf(cells);
   }
@@ -169,6 +216,7 @@ export function createWorld(renderer, scene, camera) {
     for (const e of entries) {
       grid.remove(e.group);
       e.mat.dispose();
+      e.wrongMat.dispose();
     }
     dirty = true;
     entries = pieces.map((p, index) => {
@@ -176,15 +224,22 @@ export function createWorld(renderer, scene, camera) {
         index,
         group: new THREE.Group(),
         mat: new THREE.MeshStandardMaterial({ color: toColor(p.color), roughness: 0.32 }),
+        wrongMat: new THREE.MeshStandardMaterial({
+          roughness: 0.32, emissive: 0xff1a1a, emissiveIntensity: 0.6,
+        }),
+        pos: [...p.pos],
+        lifted: false,
         sig: '',
         target: new THREE.Vector3(...p.pos),
         bounce: 0,
       };
+      tintWrong(e);
       build(e, p.cells);
       e.group.position.copy(e.target);
       grid.add(e.group);
       return e;
     });
+    updateMarks();
   }
 
   // 조각 모양·위치를 바꾼다. lift 면 그 자리 위로 띄운다(끄는 중). 위치는 frame 에서 부드럽게 따라간다.
@@ -192,9 +247,12 @@ export function createWorld(renderer, scene, camera) {
     const e = entries[i];
     if (!e) return;
     if (sigOf(piece.cells) !== e.sig) build(e, piece.cells);
-    if (piece.color !== undefined) e.mat.color.set(piece.color);
+    if (piece.color !== undefined) { e.mat.color.set(piece.color); tintWrong(e); }
+    e.pos = [...piece.pos];
+    e.lifted = lift;
     e.target.set(piece.pos[0], piece.pos[1] + (lift ? LIFT : 0), piece.pos[2]);
     dirty = true;
+    updateMarks();
   }
 
   const ray = new THREE.Raycaster();
@@ -264,7 +322,7 @@ export function createWorld(renderer, scene, camera) {
     } else {
       shaker.position.x = 0;
     }
-    const pulsing = ghost.visible && ghost.children.length > 0;
+    const pulsing = ghost.visible && ghost.children.some((m) => m.visible);
     let kind = null;
     if (dirty || moving) kind = 'motion';
     else if (pulsing && time - lastPulse >= PULSE_DT) kind = 'pulse';
@@ -282,7 +340,10 @@ export function createWorld(renderer, scene, camera) {
     setPuzzle,
     setPieces,
     updatePiece,
-    showGhost: (on) => { ghost.visible = !!on; dirty = true; },
+    showGhost: (on) => { ghost.visible = !!on; ghostOn = !!on; updateMarks(); dirty = true; },
+    // 확인용: 붉게 칠한 쌓기나무 수(조각별), 지금 보이는 반투명 칸 수
+    wrongCubes: () => entries.map((e) => e.cubes.filter((c) => c.wrong).length),
+    ghostShown: () => (ghost.visible ? ghost.children.filter((m) => m.visible).length : 0),
     setSpin: (rad) => { turntable.rotation.y = rad; dirty = true; },
     getSpin: () => turntable.rotation.y,
     pickPiece,
