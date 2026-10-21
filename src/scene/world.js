@@ -10,6 +10,7 @@ const LIFT = 0.35; // 끄는 중 조각을 띄우는 높이
 const FRAME_PAD = 0.35; // 판 칸 둘레 보라 틀 폭
 const TRIM_PAD = 0.43; // 금테 폭
 const SHAKE_TIME = 0.45; // 판 흔들기(초)
+const PULSE_DT = 1 / 30; // 목표 모양 깜빡임만 있을 때 다시 그리는 간격(초)
 
 const toColor = (c) => new THREE.Color(c);
 
@@ -58,23 +59,35 @@ export function createWorld(renderer, scene, camera) {
     transparent: true, opacity: 0.45, depthWrite: false,
   });
 
+  let dirty = true; // 다음 frame 에서 다시 그려야 한다(장면이 바뀜)
+
   // "앞" 표시
   const labelMesh = (() => {
     const cv = document.createElement('canvas');
     cv.width = 256;
     cv.height = 128;
     const g = cv.getContext('2d');
-    g.fillStyle = '#F2B93B';
-    g.beginPath();
-    if (g.roundRect) g.roundRect(8, 8, 240, 112, 56);
-    else g.rect(8, 8, 240, 112);
-    g.fill();
-    g.fillStyle = '#3A1E7A';
-    g.font = 'bold 80px Pretendard, sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText('앞', 128, 70);
+    const draw = () => {
+      g.clearRect(0, 0, 256, 128);
+      g.fillStyle = '#F2B93B';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(8, 8, 240, 112, 56);
+      else g.rect(8, 8, 240, 112);
+      g.fill();
+      g.fillStyle = '#3A1E7A';
+      g.font = 'bold 80px Pretendard, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText('앞', 128, 70);
+    };
+    draw();
     const tex = new THREE.CanvasTexture(cv);
+    // 글꼴(assets/fonts)이 늦게 오면 받은 뒤 다시 그린다.
+    document.fonts?.load?.('bold 80px Pretendard', '앞').then(() => {
+      draw();
+      tex.needsUpdate = true;
+      dirty = true;
+    }).catch(() => {});
     tex.colorSpace = THREE.SRGBColorSpace;
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(1.1, 0.55),
@@ -102,6 +115,7 @@ export function createWorld(renderer, scene, camera) {
     grid.position.set(-center.x, 0, -center.z);
     clear(board);
     clear(ghost);
+    dirty = true;
     for (const k of fp.cells) {
       const [x, z] = k.split(',').map(Number);
       const fr = new THREE.Mesh(frameGeo, frameMat);
@@ -156,6 +170,7 @@ export function createWorld(renderer, scene, camera) {
       grid.remove(e.group);
       e.mat.dispose();
     }
+    dirty = true;
     entries = pieces.map((p, index) => {
       const e = {
         index,
@@ -179,6 +194,7 @@ export function createWorld(renderer, scene, camera) {
     if (sigOf(piece.cells) !== e.sig) build(e, piece.cells);
     if (piece.color !== undefined) e.mat.color.set(piece.color);
     e.target.set(piece.pos[0], piece.pos[1] + (lift ? LIFT : 0), piece.pos[2]);
+    dirty = true;
   }
 
   const ray = new THREE.Raycaster();
@@ -207,6 +223,7 @@ export function createWorld(renderer, scene, camera) {
 
   // 그림자 켜기/끄기(저사양 모드)
   function setShadows(on) {
+    dirty = true;
     renderer.shadowMap.enabled = on;
     sun.castShadow = on;
     catcher.visible = on;
@@ -216,12 +233,22 @@ export function createWorld(renderer, scene, camera) {
     });
   }
 
+  // 한 프레임 진행. 바뀐 것이 있을 때만 그린다.
+  // -> 'motion'(조각이 움직이거나 튀거나 판이 흔들리거나 장면이 바뀌어 그림), 'pulse'(목표 모양 깜빡임만
+  //    있어 1/30초마다 그림), null(그리지 않음)
+  let lastPulse = -Infinity;
   function frame(dt = 1 / 60) {
     time += dt;
-    ghostMat.opacity = 0.42 + Math.sin(time * 2.4) * 0.1;
+    let moving = shakeT > 0;
     const k = 1 - Math.pow(0.65, dt * 60); // 60fps 에서 한 프레임 0.35 만큼 따라감
     for (const e of entries) {
-      e.group.position.lerp(e.target, k);
+      if (e.group.position.distanceToSquared(e.target) > 1e-6) {
+        e.group.position.lerp(e.target, k);
+        moving = true;
+      } else {
+        e.group.position.copy(e.target);
+      }
+      if (e.bounce > 0) moving = true;
       if (e.bounce > 0) {
         e.bounce = Math.max(0, e.bounce - 0.08 * dt * 60);
         const s = 1 + Math.sin(e.bounce * Math.PI) * 0.06;
@@ -237,21 +264,34 @@ export function createWorld(renderer, scene, camera) {
     } else {
       shaker.position.x = 0;
     }
+    const pulsing = ghost.visible && ghost.children.length > 0;
+    let kind = null;
+    if (dirty || moving) kind = 'motion';
+    else if (pulsing && time - lastPulse >= PULSE_DT) kind = 'pulse';
+    if (!kind) return null;
+    if (pulsing) {
+      ghostMat.opacity = 0.42 + Math.sin(time * 2.4) * 0.1;
+      lastPulse = time;
+    }
+    dirty = false;
     renderer.render(scene, camera);
+    return kind;
   }
 
   return {
     setPuzzle,
     setPieces,
     updatePiece,
-    showGhost: (on) => { ghost.visible = !!on; },
-    setSpin: (rad) => { turntable.rotation.y = rad; },
+    showGhost: (on) => { ghost.visible = !!on; dirty = true; },
+    setSpin: (rad) => { turntable.rotation.y = rad; dirty = true; },
     getSpin: () => turntable.rotation.y,
     pickPiece,
     floorPoint,
-    bounce: (i) => { if (entries[i]) entries[i].bounce = 1; },
-    shakeBoard: () => { shakeT = SHAKE_TIME; },
-    stopShake: () => { shakeT = 0; shaker.position.x = 0; },
+    bounce: (i) => { if (entries[i]) { entries[i].bounce = 1; dirty = true; } },
+    shakeBoard: () => { shakeT = SHAKE_TIME; dirty = true; },
+    stopShake: () => { shakeT = 0; shaker.position.x = 0; dirty = true; },
+    // 다음 frame 에서 꼭 다시 그린다(크기 바뀜 등 장면 밖 변화)
+    invalidate: () => { dirty = true; },
     setShadows,
     frame,
     // 판 좌표 -> 월드 좌표(화면 투영 등에 쓴다)

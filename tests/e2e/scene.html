@@ -75,6 +75,7 @@ if (!renderer) {
     const r = stage.getBoundingClientRect();
     renderer.setSize(r.width, r.height, false);
     fitCamera(camera, r.width, r.height);
+    world.invalidate();
   };
   new ResizeObserver(fit).observe(stage);
   fit();
