@@ -122,6 +122,7 @@ def two_solves_promote_to_stage2(browser, base):
         page.evaluate("__ck.solveCurrent()")
         page.wait_for_function("() => __ck.state().screen === 'win'", timeout=5000)
         page.wait_for_timeout(300)
+        hint = page.inner_text("#winGrow")
         page.click("#nextBtn")
         page.wait_for_function("() => __ck.state().screen === 'game'", timeout=5000)
     page.wait_for_timeout(400)
@@ -131,8 +132,9 @@ def two_solves_promote_to_stage2(browser, base):
     pid = state(page)["puzzleId"]
     shot(page, "stage2")
     check("two_solves_promote_to_stage2",
-          stage_text == "2단계 · 위에서 본 모양" and level == "2" and nums > 0 and pid.startswith("s2-") and not errors,
-          f"stage={stage_text!r} level={level} nums={nums} id={pid} errors={errors[:2]}")
+          stage_text == "2단계 · 위에서 본 모양" and level == "2"
+          and "다음: 2단계 · 위에서 본 모양" in hint and "단서 단서" not in hint and not hint.rstrip().endswith("단서") and nums > 0 and pid.startswith("s2-") and not errors,
+          f"hint={hint!r} stage={stage_text!r} level={level} nums={nums} id={pid} errors={errors[:2]}")
     ctx.close()
 
 
@@ -312,6 +314,114 @@ def load_failure_retry(browser, base):
     ctx.close()
 
 
+def win_focuses_next(browser, base):
+    ctx, page, errors = open_game(browser, base)
+    page.evaluate("__ck.solveCurrent()")
+    page.wait_for_function("() => __ck.state().screen === 'win'", timeout=5000)
+    page.wait_for_timeout(300)
+    focused = page.evaluate("() => document.activeElement && document.activeElement.id")
+    hint = page.inner_text("#winGrow")
+    check("win_focuses_next", focused == "nextBtn" and "단서 단서" not in hint and not errors,
+          f"focused={focused} hint={hint!r} errors={errors[:2]}")
+    ctx.close()
+
+
+def render_skips_when_idle(browser, base):
+    """바뀐 것이 없으면 그리지 않는다(2단계: 목표 모양 깜빡임 없음), 정답 화면에서도 그리지 않는다."""
+    ctx, page, errors = open_game(browser, base)
+    page.evaluate("__ck.setProgress({stage: 2})")
+    page.evaluate("__ck.setPuzzle('s2-001')")
+    page.wait_for_timeout(1500)
+    r0 = state(page)["renders"]
+    page.wait_for_timeout(1000)
+    r1 = state(page)["renders"]
+    page.evaluate("__ck.setSpin(0.5)")
+    page.wait_for_timeout(300)
+    r2 = state(page)["renders"]
+    page.evaluate("__ck.solveCurrent()")
+    page.wait_for_function("() => __ck.state().screen === 'win'", timeout=5000)
+    page.wait_for_timeout(300)
+    r3 = state(page)["renders"]
+    page.wait_for_timeout(1000)
+    r4 = state(page)["renders"]
+    low = state(page)["lowMode"]
+    check("render_skips_when_idle", r1 - r0 <= 2 and r2 > r1 and r4 == r3 and not low and not errors,
+          f"idle={r1 - r0} spin={r2 - r1} win={r4 - r3} low={low} errors={errors[:2]}")
+    ctx.close()
+
+
+def context_lost_card(browser, base):
+    ctx, page, errors = open_game(browser, base)
+    page.wait_for_timeout(4500)  # 정상 로드면 옛 브라우저 안내는 4초 뒤에도 뜨지 않는다
+    old = visible(page, "#oldBrowser")
+    page.evaluate("""() => { const gl = document.getElementById('c').getContext('webgl2') || document.getElementById('c').getContext('webgl');
+        gl.getExtension('WEBGL_lose_context').loseContext(); }""")
+    page.wait_for_timeout(400)
+    card = visible(page, "#glLost")
+    text = page.inner_text("#glLost") if card else ""
+    btn = page.evaluate("() => document.activeElement && document.activeElement.closest('#glLost') !== null")
+    shot(page, "context-lost")
+    check("context_lost_card", card and "화면을 다시 불러와야 해요" in text and "다시 불러오기" in text and btn and not old,
+          f"card={card} text={text!r} focus={btn} old={old} errors={errors[:2]}")
+    ctx.close()
+
+
+def old_browser_card(browser, base):
+    ctx = browser.new_context(viewport=VIEW)
+    page = ctx.new_page()
+    page.add_init_script("HTMLScriptElement.supports = () => false;")
+    page.goto(f"{base}/index.html")
+    page.wait_for_timeout(500)
+    card = visible(page, "#oldBrowser")
+    text = page.inner_text("#oldBrowser") if card else ""
+    shot(page, "old-browser")
+    # 모듈을 받지 못하면(지원하는 브라우저라도) 4초 뒤 같은 안내
+    page2 = ctx.new_page()
+    page2.route("**/src/main.js", lambda r: r.abort())
+    page2.goto(f"{base}/index.html")
+    page2.wait_for_timeout(1000)
+    early = visible(page2, "#oldBrowser")
+    page2.wait_for_timeout(4500)
+    late = visible(page2, "#oldBrowser")
+    check("old_browser_card", card and "최신 크롬이나 엣지로" in text and not early and late,
+          f"card={card} text={text!r} early={early} late={late}")
+    ctx.close()
+
+
+def portrait_pauses_timer(browser, base):
+    ctx, page, errors = open_game(browser, base)
+    page.set_viewport_size({"width": 600, "height": 900})
+    page.wait_for_timeout(300)
+    e0 = state(page)
+    page.wait_for_timeout(1200)
+    e1 = state(page)
+    page.set_viewport_size(VIEW)
+    page.wait_for_timeout(1000)
+    e2 = state(page)
+    ok = (e0["paused"] and "portrait" in e0["pauseReasons"] and abs(e1["elapsed"] - e0["elapsed"]) < 0.01
+          and not e2["paused"] and 0.7 < e2["elapsed"] - e1["elapsed"] < 2.0)
+    check("portrait_pauses_timer", ok and not errors,
+          f"elapsed {e0['elapsed']:.2f} -> {e1['elapsed']:.2f} -> {e2['elapsed']:.2f} reasons={e0['pauseReasons']}")
+    ctx.close()
+
+
+def easy_space_reserved(browser, base):
+    """시작 배치가 피하는 카드 영역에 쉬운 단서 버튼 높이가 미리 들어간다."""
+    ctx, page, errors = open_game(browser, base)
+    page.evaluate("__ck.setProgress({stage: 2})")
+    page.evaluate("__ck.setPuzzle('s2-001')")
+    page.wait_for_timeout(200)
+    hidden_rect = page.evaluate("__ck.uiRects()[0]")
+    still_hidden = page.evaluate("document.querySelector('#easyBtn').hidden")
+    page.evaluate("__ck.elapsed(70)")
+    page.wait_for_function("() => !document.querySelector('#easyBtn').hidden", timeout=3000)
+    card = page.evaluate("""() => { const b = document.querySelector('#screen-game').getBoundingClientRect();
+        const r = document.querySelector('#clueCard').getBoundingClientRect(); return r.bottom - b.top; }""")
+    check("easy_space_reserved", still_hidden and abs(hidden_rect["b"] - card) < 1.5 and not errors,
+          f"reserved_b={hidden_rect['b']:.1f} shown_b={card:.1f} hidden={still_hidden}")
+    ctx.close()
+
+
 def webgl_fail_message(base):
     with sync_playwright() as p:
         browser = p.chromium.launch(channel="msedge", args=["--disable-webgl", "--disable-webgl2", "--disable-3d-apis"])
@@ -344,7 +454,8 @@ def main():
             try:
                 for fn in (solve_shows_win_and_scores, two_solves_promote_to_stage2, all_on_board_wrong_shakes,
                            easy_hint_after_60s, skip_lowers_streak, stage4_alt_shape_accepted, help_keeps_puzzle,
-                           drag_then_skip_is_safe, load_failure_retry):
+                           drag_then_skip_is_safe, load_failure_retry, win_focuses_next, render_skips_when_idle,
+                           context_lost_card, old_browser_card, portrait_pauses_timer, easy_space_reserved):
                     try:
                         fn(browser, base)
                     except Exception as e:  # 한 시험이 죽어도 나머지는 돈다

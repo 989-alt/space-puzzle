@@ -24,7 +24,8 @@ const TIPS = {
   },
 };
 
-const handlers = { start: [], tutorialDone: [], next: [] };
+const handlers = { start: [], tutorialDone: [], next: [], portrait: [] };
+let portraitOn = false;
 let current = 'title';
 let tutorialReturn = 'game';
 let inited = false;
@@ -96,6 +97,11 @@ export function onStart(cb) { handlers.start.push(cb); }
 // cb({ dontShowAgain, mode })
 export function onTutorialDone(cb) { handlers.tutorialDone.push(cb); }
 export function onNext(cb) { handlers.next.push(cb); }
+// cb(on): 세로 화면 안내가 뜨거나(true) 사라질 때(false). 등록할 때 지금 떠 있으면 바로 한 번 부른다.
+export function onPortrait(cb) {
+  handlers.portrait.push(cb);
+  if (portraitOn) cb(true);
+}
 
 export function setTitleStats({ best = 0, island = 0 } = {}) {
   const t = $('#bestText');
@@ -146,6 +152,7 @@ export function showWin({ gained = 0, base = 100, speed = 0, streak = 0, mult = 
   }
   showScreen('win');
   spawnConfetti();
+  $('#nextBtn')?.focus({ preventScroll: true }); // Enter·스페이스로 바로 다음 문제
 }
 
 function clearConfetti() {
@@ -174,7 +181,12 @@ function watchPortrait() {
   const hint = $('#rotateHint');
   if (!hint || !globalThis.matchMedia) return;
   const mq = matchMedia('(orientation: portrait)');
-  const apply = () => { hint.hidden = !mq.matches; };
+  const apply = () => {
+    hint.hidden = !mq.matches;
+    if (portraitOn === mq.matches) return;
+    portraitOn = mq.matches;
+    handlers.portrait.forEach((cb) => cb(portraitOn));
+  };
   apply();
   mq.addEventListener?.('change', apply);
 }

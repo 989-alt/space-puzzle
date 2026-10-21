@@ -15,11 +15,11 @@ import { load, save } from './core/storage.js';
 import { fitCamera } from './scene/calibrate.js';
 import { createWorld } from './scene/world.js';
 import { avoidColumns } from './scene/avoid.js';
-import { createRenderer, watchFps } from './scene/perf.js';
+import { createRenderer, createFpsMeter } from './scene/perf.js';
 import { attachInput } from './scene/input.js';
 import {
   initScreens, showScreen, currentScreen, openTutorial, onStart, onTutorialDone, onNext,
-  showWin, setTitleStats, detectInputKind, showWebGLError,
+  showWin, setTitleStats, detectInputKind, showWebGLError, onPortrait,
 } from './ui/screens.js';
 import { renderHud, showBubble, hideBubble, setEasyAvailable, onTool, levelName } from './ui/hud.js';
 import { renderClue } from './ui/clueCard.js';
@@ -78,7 +78,8 @@ let usedEasy = false;
 let attemptNo = 0;
 let attemptId = '';
 let startAt = 0; // performance.now() 기준 문제 시작 시각
-let pausedAt = null; // 도움말이 열린 시각(열려 있는 동안 경과 시간을 멈춘다)
+let pausedAt = null; // 멈춘 시각(도움말·세로 화면 안내가 떠 있는 동안 경과 시간을 멈춘다)
+const pauseReasons = new Set(); // 'help' | 'portrait'
 let loadFailed = false; // 문제 은행을 받지 못해 새 문제를 못 냈다
 let solved = false;
 let started = false; // 게임에 한 번이라도 들어갔는지
@@ -87,11 +88,13 @@ let loading = Promise.resolve();
 
 const nowOrPaused = () => pausedAt ?? performance.now();
 const elapsedSec = () => (nowOrPaused() - startAt) / 1000;
-function pauseTimer() {
+function pauseTimer(reason = 'help') {
+  pauseReasons.add(reason);
   if (pausedAt === null) pausedAt = performance.now();
 }
-function resumeTimer() {
-  if (pausedAt === null) return;
+function resumeTimer(reason = 'help') {
+  pauseReasons.delete(reason);
+  if (pausedAt === null || pauseReasons.size) return;
   startAt += performance.now() - pausedAt;
   pausedAt = null;
 }
@@ -117,6 +120,8 @@ const renderer = createRenderer(canvas);
 let world = null;
 let input = null;
 let camera = null;
+let meter = null; // 그린 프레임만 재는 fps 측정기(게임에 처음 들어갈 때 만든다)
+let renders = 0; // 확인용: 실제로 그린 프레임 수
 
 if (renderer) {
   const scene = new THREE.Scene();
@@ -127,6 +132,7 @@ if (renderer) {
     if (r.width < 1 || r.height < 1) return;
     renderer.setSize(r.width, r.height, false);
     fitCamera(camera, r.width, r.height);
+    world.invalidate();
   };
   new ResizeObserver(fit).observe(stage);
   fit();
@@ -137,27 +143,52 @@ if (renderer) {
     onDrop: () => check(),
     onRotate: () => check(),
   });
+  // 게임 화면이 보일 때(도움말이 위에 겹친 때 포함)만, 바뀐 것이 있을 때만 그린다(world.frame).
+  // fps 는 게임 화면에서 움직임을 그린 프레임만 잰다. 겹친 화면(도움말의 흐림 효과)이 있으면 재지 않는다.
   let last = performance.now();
   renderer.setAnimationLoop((now) => {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    const scr = currentScreen();
-    if (scr === 'game' || scr === 'tutorial') world.frame(dt);
+    if (!stage.classList.contains('on')) { meter?.gap(); return; }
+    const kind = world.frame(dt);
+    if (kind) renders += 1;
+    if (kind === 'motion' && currentScreen() === 'game') meter?.frame(now);
+    else meter?.gap();
   });
+  // GPU 가 화면을 잃으면(절전·드라이버 재시작 등) 다시 불러오라고 안내한다.
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    input?.cancel();
+    const card = $('#glLost');
+    if (card) {
+      card.hidden = false;
+      card.querySelector('button')?.focus({ preventScroll: true });
+    }
+  });
+  $('#glLost button')?.addEventListener('click', () => location.reload());
 } else {
   showWebGLError();
 }
 
 // 조각이 가려지면 안 되는 화면 UI. 위쪽 칩·미션·섬 배지는 작업대 바깥이라 단서 카드만 본다.
 // 게임 화면이 보일 때만 잰다(숨겨져 있으면 크기가 0이라 건너뛴다).
+// 쉬운 단서 버튼은 문제 도중에 나타나 카드를 길게 만들므로, 숨겨져 있으면 잠깐 보이게 해 그 높이까지 잰다.
 const UI_SELECTORS = ['#clueCard'];
+function measureWithEasy(el) {
+  const easy = $('#easyBtn');
+  if (!easy || !easy.hidden || !el.contains(easy)) return el.getBoundingClientRect();
+  easy.hidden = false;
+  const r = el.getBoundingClientRect();
+  easy.hidden = true;
+  return r;
+}
 function uiRects() {
   const base = stage.getBoundingClientRect();
   const out = [];
   for (const sel of UI_SELECTORS) {
     const el = $(sel);
     if (!el || el.hidden) continue;
-    const r = el.getBoundingClientRect();
+    const r = measureWithEasy(el);
     if (r.width < 2 || r.height < 2) continue;
     out.push({ l: r.left - base.left, t: r.top - base.top, r: r.right - base.left, b: r.bottom - base.top });
   }
@@ -276,7 +307,7 @@ function win() {
   const islandAfter = islandStage(progress.solvedTotal);
   const toNext = toNextIsland(progress.solvedTotal);
   const nextHint = res.promoted
-    ? `다음: ${levelName(progress.stage)} 단서`
+    ? `다음: ${levelName(progress.stage)}`
     : (toNext == null ? '가장 큰 섬을 지었어요' : `다음 단계까지 ${toNext}문제`);
   showWin({
     gained: res.gained, base: 100, speed: Math.max(0, 60 - Math.floor(seconds)),
@@ -314,8 +345,15 @@ function skip() {
 
 function restart() {
   if (!puzzle || solved) return;
+  let next;
+  try {
+    next = startPieces(puzzle); // begin() 처럼: 배치가 안 되면 지금 배치를 그대로 둔다
+  } catch (err) {
+    console.warn('다시 놓을 자리를 찾지 못해 그대로 둡니다', puzzle.id, err);
+    return;
+  }
   input?.cancel();
-  pieces = startPieces(puzzle);
+  pieces = next;
   world?.setPieces(pieces);
 }
 
@@ -324,7 +362,7 @@ function enterGame() {
   showScreen('game');
   if (started) return;
   started = true;
-  if (renderer) watchFps(renderer, world);
+  if (renderer) meter = createFpsMeter(renderer, world);
   nextPuzzle();
 }
 
@@ -340,7 +378,7 @@ onTutorialDone(({ dontShowAgain, mode }) => {
   if (dontShowAgain) save('tutorialSeen', true);
   // 도움말로 연 안내는 닫기만 한다(같은 문제·같은 배치로 돌아간다).
   if (mode === 'help') {
-    resumeTimer();
+    resumeTimer('help');
     showScreen('game');
   } else enterGame();
 });
@@ -351,10 +389,12 @@ onNext(() => {
 });
 onTool('help', () => {
   input?.cancel();
-  pauseTimer(); // 도움말을 보는 동안 시간은 멈춘다
+  pauseTimer('help'); // 도움말을 보는 동안 시간은 멈춘다
   openTutorial({ inputKind: detectInputKind(), mode: 'help' });
 });
 onTool('retry', () => nextPuzzle());
+// 세로 화면 안내가 떠 있는 동안은 풀 수 없으니 시간도 멈춘다.
+onPortrait((on) => (on ? pauseTimer('portrait') : resumeTimer('portrait')));
 onTool('easy', useEasy);
 onTool('skip', skip);
 onTool('restart', restart);
@@ -385,7 +425,7 @@ if (E2E) {
       screen: currentScreen(), stage: progress.stage, streak: progress.streak, score: progress.score,
       solvedTotal: progress.solvedTotal, best: progress.best, level, usedEasy, solved,
       puzzleId: puzzle?.id ?? null, attemptId, elapsed: puzzle ? elapsedSec() : 0, shakes, webgl: !!renderer,
-      paused: pausedAt !== null, loadFailed,
+      paused: pausedAt !== null, pauseReasons: [...pauseReasons], loadFailed, lowMode: meter?.done ?? false, renders,
     }),
     puzzle: () => (puzzle ? JSON.parse(JSON.stringify(puzzle)) : null),
     pieces: () => copy(pieces),
@@ -418,6 +458,7 @@ if (E2E) {
       return !!sol;
     },
     placeAll,
+    uiRects,
     // id(은행 문제) 또는 {id, target, pieces} 고정 문제로 바꾼다.
     async setPuzzle(idOrProto) {
       await loading;

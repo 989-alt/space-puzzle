@@ -121,6 +121,15 @@ button.easy[hidden],.chip[hidden]{display:none}
 #glFail[hidden],#loadFail[hidden]{display:none}
 #loadFail p{margin:0 0 1.2cqw}
 #loadFail .gold{font-size:max(18px,2.2cqw);padding:.6cqw 3cqw}
+/* 시스템 안내 카드(화면을 잃음·옛 브라우저): 어느 화면 위에든 가운데 */
+.sys-card{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(86vw,600px);padding:28px 32px;text-align:center;
+  font-weight:800;font-size:20px;line-height:1.6;z-index:30;word-break:keep-all;border-width:5px;border-radius:20px}
+.sys-card[hidden]{display:none}
+.sys-card p{margin:0 0 16px}
+.sys-card p:last-child{margin:0}
+.sys-card .gold{font-size:22px;padding:8px 32px}
+/* 게임 화면: 길게 눌러도 글자 선택·iOS 메뉴가 뜨지 않게 */
+#screen-game{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 
 /* ④ 정답 */
 #screen-win{z-index:3}

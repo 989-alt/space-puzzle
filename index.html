@@ -124,8 +124,27 @@
  </section>
 
  <div id="rotateHint" role="alert" hidden><svg><use href="#i-phone-rotate"/></svg><p>화면을 가로로 돌려 주세요</p></div>
+ <div class="card sys-card" id="glLost" role="alert" hidden><p>화면을 다시 불러와야 해요</p><button class="gold" type="button"><svg><use href="#i-undo"/></svg>다시 불러오기</button></div>
+ <div class="card sys-card" id="oldBrowser" role="alert" hidden><p>이 브라우저에서는 게임을 열 수 없어요. 최신 크롬이나 엣지로 열어 주세요.</p></div>
 </div>
 
+<script>
+// 모듈·importmap 을 못 쓰는 옛 브라우저 안내(일반 스크립트, 옛 문법만). 지원해도 불러온 뒤 4초 안에
+// 게임 모듈이 준비(window.__ckReady)되지 않으면 같은 안내를 띄운다.
+(function () {
+  function show() {
+    var el = document.getElementById('oldBrowser');
+    if (el) { el.hidden = false; el.style.display = 'block'; }
+  }
+  var S = window.HTMLScriptElement;
+  var noModule = !(S && 'noModule' in S.prototype);
+  var noMap = !!(S && typeof S.supports === 'function' && !S.supports('importmap'));
+  if (noModule || noMap) { show(); return; }
+  window.addEventListener('load', function () {
+    setTimeout(function () { if (!window.__ckReady) show(); }, 4000);
+  });
+})();
+</script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
