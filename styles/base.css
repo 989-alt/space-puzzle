@@ -1,0 +1,68 @@
+/* 토큰·글꼴·공통 부품(칩, 금색 버튼, 입체 로고, 금테 카드). 시안 design-v2 / design-v4-game 에서 옮김. */
+:root{
+  --ink:#2A1A5E; --purple:#4B2A9A; --purple-2:#6A44C9;
+  --gold-1:#FFF1A6; --gold-2:#FFC529; --gold-3:#F29B00; --gold-edge:#B4690A;
+  --cream:#FFF8E8; --chip:rgba(36,22,74,.72); --rim:#F3C24E; --rim-shadow:#A86A12;
+  --ghost:#8FEFFF;
+  --font-title:'Jua','Pretendard','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+  --font-body:'Pretendard','Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#17112E;color:#fff;font-family:var(--font-body);
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible+.box{outline:3px solid var(--ghost);outline-offset:3px}
+.jua{font-family:var(--font-title);font-weight:400}
+svg.i{width:1em;height:1em;flex:none}
+
+/* 반투명 칩 */
+.chip{display:inline-flex;align-items:center;gap:.6cqw;background:var(--chip);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  border-radius:999px;padding:.7cqw 1.4cqw;font-weight:700;font-size:1.3cqw;color:#fff;border:1px solid rgba(255,255,255,.18);white-space:nowrap}
+.chip .dot{width:.8cqw;height:.8cqw;border-radius:50%;background:#5EE1FF;display:inline-block;flex:none}
+.chip svg{width:1.6cqw;height:1.6cqw}
+.combo{background:linear-gradient(180deg,#FF8A3D,#E8430F);border-color:#FFD2A8}
+
+/* 입체 글자 로고 */
+.lg{position:relative;display:block;font-family:var(--font-title);font-weight:400;font-size:9.5cqw;letter-spacing:-.2cqw;line-height:1.05;white-space:nowrap}
+.lg::before{content:attr(data-t);position:absolute;left:0;right:0;top:0;color:#2B1263;-webkit-text-stroke:1.5cqw #2B1263;
+  text-shadow:0 1.1cqw 0 #2B1263,0 1.6cqw 2cqw rgba(0,0,0,.45);z-index:0}
+.lg span{position:relative;z-index:1;background:linear-gradient(180deg,#FFFBD6 0%,#FFE15C 40%,#FFB300 70%,#FF8A00 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.lg.blue span{background:linear-gradient(180deg,#F0FDFF 0%,#8BE8FF 45%,#2FB4F5 75%,#1C7FE0 100%);-webkit-background-clip:text;background-clip:text}
+.sparkle{position:absolute;width:3cqw;height:3cqw;pointer-events:none;
+  background:radial-gradient(circle,#fff 0 15%,transparent 16%),conic-gradient(from 45deg,transparent 0 10%,#FFF6C2 12% 13%,transparent 15% 35%,#FFF6C2 37% 38%,transparent 40% 60%,#FFF6C2 62% 63%,transparent 65% 85%,#FFF6C2 87% 88%,transparent 90%);
+  filter:drop-shadow(0 0 .6cqw #FFE680);animation:twinkle 2.4s ease-in-out infinite}
+@keyframes twinkle{50%{opacity:.45;scale:.8}}
+
+/* 금색 광택 버튼 */
+.gold{display:inline-flex;align-items:center;justify-content:center;gap:1cqw;min-width:48px;min-height:48px;font-family:var(--font-title);font-weight:400;
+  color:#5A2C00;border:.35cqw solid #FFF4B8;border-radius:999px;cursor:pointer;white-space:nowrap;touch-action:manipulation;
+  background:linear-gradient(180deg,var(--gold-1) 0%,var(--gold-2) 48%,var(--gold-3) 100%);
+  box-shadow:0 .7cqw 0 var(--gold-edge),0 1.4cqw 2.4cqw rgba(40,10,0,.45),inset 0 .5cqw 0 rgba(255,255,255,.7),inset 0 -.5cqw 0 rgba(180,90,0,.35);
+  text-shadow:0 .15cqw 0 rgba(255,255,255,.6);transition:translate .15s ease-out,box-shadow .15s ease-out}
+.gold:hover{translate:0 -.2cqw}
+.gold:active{translate:0 .4cqw;box-shadow:0 .2cqw 0 var(--gold-edge),inset 0 .5cqw 0 rgba(255,255,255,.7)}
+.gold svg{width:1em;height:1em}
+.ghostbtn{display:inline-flex;align-items:center;justify-content:center;gap:.6cqw;min-height:48px;min-width:48px;font-family:var(--font-title);color:#fff;
+  background:var(--chip);border:2px solid rgba(255,255,255,.35);border-radius:999px;padding:.8cqw 2cqw;font-size:1.6cqw;cursor:pointer;touch-action:manipulation}
+.ghostbtn:hover{background:rgba(54,34,104,.85)}
+.ghostbtn svg{width:1.2em;height:1.2em}
+
+/* 자막 띠 */
+.pill{background:rgba(36,22,74,.78);border-radius:1.2cqw;padding:1cqw 2.4cqw;font-weight:800;font-size:1.9cqw;color:#fff;border:1px solid rgba(255,255,255,.2);white-space:nowrap}
+
+/* 금테 크림 카드 */
+.card{background:var(--cream);border:.45cqw solid var(--rim);border-radius:1.6cqw;color:var(--ink);
+  box-shadow:0 1cqw 0 var(--rim-shadow),0 1.6cqw 3cqw rgba(0,0,0,.4)}
+.star{position:absolute;top:-1.6cqw;left:50%;transform:translateX(-50%);width:3.2cqw;height:3.2cqw;z-index:2;
+  background:radial-gradient(circle at 35% 30%,#FFF6C2,#FFC529 55%,#E08A00);
+  clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+
+/* 진행 바 */
+.bar{height:.9cqw;border-radius:999px;background:rgba(255,255,255,.15);overflow:hidden;border:1px solid rgba(255,255,255,.3)}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7CF3FF,#FFE27A);transition:width .4s ease-out}
+
+@media (prefers-reduced-motion:reduce){
+  .sparkle{animation:none}
+  .gold,.bar i{transition:none}
+}
