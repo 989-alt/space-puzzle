@@ -57,3 +57,13 @@ test('lieFlat makes I-bar height 1 and long along x', () =>
 
 test('lieFlat long along z', () =>
   assert.deepEqual(dims(lieFlat([[0, 0, 0], [1, 0, 0], [2, 0, 0]], 'z')), [1, 1, 3]));
+
+test('chiral screw tetracube has 12 orientations, mirror image shares none', () => {
+  // 나사 사면체는 180도 대칭이 있어 24가 아니라 12방향이며, 거울상 12방향과 겹치지 않는다(합 24).
+  const a = orientations([[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 1]]);
+  const m = orientations([[0, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, -1]]);
+  assert.equal(a.length, 12);
+  assert.equal(m.length, 12);
+  const set = new Set(a.map((o) => JSON.stringify(o)));
+  assert.equal(m.filter((o) => set.has(JSON.stringify(o))).length, 0);
+});

@@ -21,3 +21,6 @@ test('occupiedSet collects all piece cells except one', () => {
   assert.deepEqual([...occupiedSet(pieces)].sort(), ['0,0,0', '1,0,0', '5,1,5']);
   assert.deepEqual([...occupiedSet(pieces, 0)], ['5,1,5']);
 });
+
+test('dropY never slides under an overhang', () =>
+  assert.equal(dropY([[0, 0, 0]], 0, 0, new Set(['0,1,0'])), 2));

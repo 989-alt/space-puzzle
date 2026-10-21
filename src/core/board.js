@@ -15,12 +15,19 @@ export function occupiedSet(pieces, exceptIndex) {
   return set;
 }
 
-// cells를 (x, z) 위에 놓았을 때 occupied와 겹치지 않는 가장 낮은 y(>= 0)
+// 위에서 떨어뜨리듯 놓는 높이(>= 0). 각 칸이 자기 기둥의 가장 높은 점유 칸 위에 얹히는
+// 높이 중 최대값이라, 돌출부 밑 빈 칸으로 미끄러져 들어가지 않는다.
 export function dropY(cells, x, z, occupied) {
-  let top = -1;
-  for (const k of occupied) top = Math.max(top, Number(k.split(',')[1]));
-  for (let y = 0; y <= top + 1; y++) {
-    if (!cells.some((c) => occupied.has(key([c[0] + x, c[1] + y, c[2] + z])))) return y;
+  const top = new Map(); // "x,z" -> 그 기둥의 가장 높은 점유 y
+  for (const k of occupied) {
+    const [ox, oy, oz] = k.split(',').map(Number);
+    const col = `${ox},${oz}`;
+    if (!top.has(col) || oy > top.get(col)) top.set(col, oy);
   }
-  return top + 1;
+  let y = 0;
+  for (const c of cells) {
+    const t = top.get(`${c[0] + x},${c[2] + z}`) ?? -1;
+    y = Math.max(y, t + 1 - c[1]);
+  }
+  return y;
 }
