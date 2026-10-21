@@ -185,3 +185,34 @@ test('rotateNearEdgeStaysInside', () => {
   const ry = rotatePiece(piece, 'y', pieces, center);
   assert.deepEqual(dims(ry.cells), [1, 1, 4]);
 });
+
+// 화면 UI(단서 카드 등) 아래로 들어가는 칸은 시작 자리에서 뺀다(avoid). 자리가 없으면 avoid 없이 다시 찾는다.
+test('placeStarts keeps pieces out of avoid columns (all 160 puzzles, seed 1)', () => {
+  const bad = [];
+  let moved = 0;
+  for (const p of bank) {
+    const fp = footprint(p.target);
+    const center = boardCenter(fp);
+    // 판 중심 오른쪽 3.5칸 이상, 뒤쪽 절반(z < 중심)인 칸을 UI 아래라고 친다.
+    const avoid = new Set();
+    for (let x = Math.floor(center.x + 3); x <= Math.ceil(center.x + 6); x++) {
+      for (let z = Math.floor(center.z - 6); z <= Math.ceil(center.z + 0.5); z++) avoid.add(`${x},${z}`);
+    }
+    const st = placeStarts(p.pieces, fp, mulberry32(1), undefined, avoid);
+    const hit = st.some((s) => colsOf(s.cells, s.x, s.z).some(([x, z]) => avoid.has(`${x},${z}`)));
+    if (hit) bad.push(p.id);
+    const plain = placeStarts(p.pieces, fp, mulberry32(1));
+    if (JSON.stringify(plain) !== JSON.stringify(st)) moved++;
+  }
+  assert.deepEqual(bad, []);
+  assert.ok(moved > 0, 'avoid should change at least one layout');
+});
+
+test('placeStarts falls back to ignoring avoid when it leaves no room', () => {
+  const p = bank.find((e) => e.id === 's4-006');
+  const fp = footprint(p.target);
+  const all = new Set();
+  for (let x = -10; x <= 20; x++) for (let z = -10; z <= 20; z++) all.add(`${x},${z}`);
+  const st = placeStarts(p.pieces, fp, mulberry32(1), undefined, all);
+  assert.equal(st.length, p.pieces.length);
+});

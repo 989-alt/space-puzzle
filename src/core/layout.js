@@ -90,11 +90,13 @@ const VARIANT_PENALTY = 0.75; // 정해진 눕힌 방향을 조금 더 선호
 // 목표 각도 지점에 가장 가까운 곳을 고른다. 목표 지점 근처에 없으면 창 전체에서 가장 가까운 곳을
 // 찾는다. 앞 조각이 자리를 다 막아 뒤 조각이 들어갈 곳이 없으면(5x4 판 등) 되돌아가서 앞 조각의
 // 다음 후보 자리를 시도한다. 후보는 모든 눕힌 방향을 섞어 (거리 + 방향 순서 벌점 0.75) 순이다.
+// avoid(선택): "x,z" 칸 집합. 화면 UI(단서 카드 등) 아래로 가려지는 칸이라 조각을 두지 않는다. 그렇게
+// 하면 자리가 없을 때는 avoid 없이 다시 찾는다.
 // 끝내 안 되면 칸 수를 담은 Error 를 던진다. -> [{cells, x, z}] (y 는 dropY 로 따로 구한다)
-export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceCellsList.length)) {
+export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceCellsList.length), avoid = null) {
   const center = boardCenter(fp);
   const n = pieceCellsList.length;
-  const base = new Set();
+  const base = new Set(avoid || []);
   addWithRing(base, [...fp.cells].map((k) => k.split(',').map(Number)));
   // "앞" 표시 바로 앞 통로(둘레 다음 줄부터 작업대 끝까지, 가운데 2~3열)도 비운다.
   // 앞 조각이 표시를 가리지 않고 왼앞·오른앞으로 비켜 놓인다. 통로까지 비우면 자리가 없는
@@ -174,6 +176,7 @@ export function placeStarts(pieceCellsList, fp, rng, angles = startAngles(pieceC
     nodes = 0;
     place(0, base);
   }
+  if (!best && avoid && avoid.size) return placeStarts(pieceCellsList, fp, rng, angles);
   if (!best) {
     const cnt = pieceCellsList.map((c) => c.length).join('+');
     throw new Error(`작업대에 조각(${cnt}칸, 판 ${fp.w}x${fp.d})을 모두 놓을 자리가 없습니다`);

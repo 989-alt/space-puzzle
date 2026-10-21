@@ -14,6 +14,7 @@ import {
 import { load, save } from './core/storage.js';
 import { fitCamera } from './scene/calibrate.js';
 import { createWorld } from './scene/world.js';
+import { avoidColumns } from './scene/avoid.js';
 import { createRenderer, watchFps } from './scene/perf.js';
 import { attachInput } from './scene/input.js';
 import {
@@ -147,10 +148,31 @@ if (renderer) {
   showWebGLError();
 }
 
-// 시작 배치: 각 조각을 눕혀 판 둘레에 두고 위에서 떨어뜨린다.
+// 조각이 가려지면 안 되는 화면 UI. 위쪽 칩·미션·섬 배지는 작업대 바깥이라 단서 카드만 본다.
+// 게임 화면이 보일 때만 잰다(숨겨져 있으면 크기가 0이라 건너뛴다).
+const UI_SELECTORS = ['#clueCard'];
+function uiRects() {
+  const base = stage.getBoundingClientRect();
+  const out = [];
+  for (const sel of UI_SELECTORS) {
+    const el = $(sel);
+    if (!el || el.hidden) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    out.push({ l: r.left - base.left, t: r.top - base.top, r: r.right - base.left, b: r.bottom - base.top });
+  }
+  return out;
+}
+
+// 시작 배치: 각 조각을 눕혀 판 둘레에 두고 위에서 떨어뜨린다. 단서 카드 등에 가려지는 칸은 피한다.
 function startPieces(p) {
   const fp = footprint(p.target);
-  const starts = placeStarts(p.pieces, fp, Math.random);
+  const base = stage.getBoundingClientRect();
+  // 높이 1칸·여유 0으로 잰다. 더 넉넉하게(2칸·10px) 잡으면 1단계에서 오른쪽 조각이 뒤로 밀려 목표 모양에 겹친다.
+  const avoid = camera && base.width > 1
+    ? avoidColumns(camera, uiRects(), boardCenter(fp), { W: base.width, H: base.height, maxH: 1, margin: 0 })
+    : null;
+  const starts = placeStarts(p.pieces, fp, Math.random, undefined, avoid);
   const out = [];
   starts.forEach((s, i) => {
     const y = dropY(s.cells, s.x, s.z, occupiedSet(out, -1));
@@ -165,7 +187,15 @@ function showClue() {
 }
 
 function begin(p) {
-  const nextPieces = startPieces(p); // 배치가 안 되면 여기서 던지고 지금 문제는 그대로 둔다
+  // 새 단서 카드를 먼저 그려 크기를 맞춘 뒤 카드에 가려지지 않는 자리를 고른다.
+  renderClue($('#clueCard'), clueFor(p.target, progress.stage));
+  let nextPieces;
+  try {
+    nextPieces = startPieces(p); // 배치가 안 되면 여기서 던지고 지금 문제는 그대로 둔다
+  } catch (err) {
+    if (puzzle) showClue(); // 미리 그린 새 카드를 지금 문제의 카드로 되돌린다
+    throw err;
+  }
   input?.cancel(); // 끌던 조각·열린 링을 버린다
   puzzle = { id: p.id, target: p.target, pieces: p.pieces };
   pieces = nextPieces;
