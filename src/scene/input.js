@@ -1,8 +1,9 @@
 // 입력: 조각 끌기, 톡 누르기·길게 누르기 → 돌리기 링(버튼 3개), 빈 곳 끌기·두 손가락 → 회전판.
 // 포인터 이벤트 하나로 터치(학교 태블릿·크롬북)와 마우스(교사 PC)를 함께 처리한다.
 // 조각 좌표는 판 좌표다. 끌기·돌리기 결과는 movePiece/rotatePiece 로 만들고(작업대 안, 위에서 떨어뜨림)
-// setPiece(i, piece) 로 넘긴 뒤 world.updatePiece 로 화면에 반영한다.
+// setPiece(i, piece) 로 넘긴 뒤 world.updatePiece 로 화면에 반영한다. 그 뒤 settleAll 로 받침이 빠진 조각을 떨어뜨린다.
 import { movePiece, rotatePiece } from '../core/layout.js';
+import { settleAll } from '../core/board.js';
 
 const DRAG_PX = 8; // 이보다 많이 움직여야 끌기
 const LONG_MS = 450; // 길게 누르기
@@ -116,6 +117,18 @@ export function attachInput({
   const hideRing = () => ring.classList.remove('on');
   const clearTimer = () => { clearTimeout(timer); timer = 0; };
 
+  // 중력: 받침이 빠진 다른 조각을 떨어뜨린다(except = 끄는 중인 조각, 움직이지 않음). 내려온 조각은 튀긴다.
+  function settle(except = -1) {
+    const pieces = getPieces();
+    const out = settleAll(pieces, except);
+    out.forEach((p, i) => {
+      if (p === pieces[i]) return;
+      setPiece(i, p);
+      world.updatePiece(i, p, { lift: false });
+      world.bounce(i);
+    });
+  }
+
   // 끌기 중 한 번 옮기기(판 좌표, 정수로 반올림 후 movePiece)
   function dragTo(x, y) {
     const f = world.floorPoint(ndcOf(x, y));
@@ -126,6 +139,7 @@ export function attachInput({
     const next = movePiece(p, Math.round(f.x - drag.off[0]), Math.round(f.z - drag.off[1]), pieces, world.center());
     setPiece(drag.i, next);
     world.updatePiece(drag.i, next, { lift: true });
+    settle(drag.i); // 끄는 조각이 떠난 자리 위 조각은 내려온다
   }
 
   // 끌기 끝(떼기·취소·캡처 잃음·두 번째 포인터): 마지막 칸에 내려놓는다
@@ -138,6 +152,7 @@ export function attachInput({
     setPiece(i, next);
     world.updatePiece(i, next, { lift: false });
     world.bounce(i);
+    settle();
     onDrop(i);
   }
 
@@ -262,6 +277,7 @@ export function attachInput({
     setPiece(i, next);
     world.updatePiece(i, next, { lift: false });
     world.bounce(i);
+    settle();
     onRotate(i, axis);
   }
 

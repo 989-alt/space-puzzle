@@ -323,7 +323,28 @@ def ghost_mouse_hover_does_not_spin(page, ptr):
     assert pieces(page)[0]["pos"] != before and page.evaluate("__ck.spin()") == 0
 
 
-TESTS = [drag_moves_piece, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
+def drag_support_away_top_lands(page, ptr):
+    # 막대(1번) 왼쪽 끝 위에 2칸 조각(2번)을 얹고, 막대 오른쪽 끝을 잡아 오른쪽으로 멀리 끈다.
+    # 받침이 빠진 2번은 바닥(y=0)으로 내려와야 한다(떠 있으면 안 된다).
+    page.evaluate("""() => __ck.place([
+        [0, [[0,0,0]], [5,0,-2]],
+        [1, [[0,0,0],[1,0,0],[2,0,0],[3,0,0]], [-1,0,4]],
+        [2, [[0,0,0],[1,0,0]], [-1,1,4]]])""")
+    page.wait_for_timeout(300)
+    assert pieces(page)[2]["pos"] == [-1, 1, 4]
+    a = page.evaluate("__ck.project(2.5, 0.5, 4.5)")
+    a = (a["x"], a["y"])
+    assert page.evaluate(f"""() => {{ const r = document.getElementById('c').getBoundingClientRect();
+        return __ck.world.pickPiece({{ x: ({a[0]} - r.left) / r.width * 2 - 1, y: -(({a[1]} - r.top) / r.height) * 2 + 1 }}); }}""") == 1
+    ptr.drag(a, (a[0] + 260, a[1]))
+    page.wait_for_timeout(400)
+    ps = pieces(page)
+    assert ps[1]["pos"][0] >= 1, f"bar did not move far enough {ps[1]}"
+    assert ps[2]["pos"] == [-1, 0, 4], f"top piece left floating {ps[2]}"
+    assert is_int(target_y(page, 2)) and target_y(page, 2) == 0, f"top piece target {target_y(page, 2)}"
+
+
+TESTS = [drag_moves_piece, drag_support_away_top_lands, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
          long_press_opens_ring, empty_tap_hides_ring, empty_drag_spins, cancel_mid_drag_lands,
          ghost_pointer_then_drag_moves]
 TOUCH_ONLY = [second_finger_lands_then_spins]

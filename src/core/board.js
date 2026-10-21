@@ -31,3 +31,28 @@ export function dropY(cells, x, z, occupied) {
   }
   return y;
 }
+
+// 중력: 받침이 빠진 조각을 아래로 떨어뜨린다. 낮은 조각부터 한 칸씩 내려 보내며, 바로 아래 칸이
+// 바닥(y=0)이거나 다른 조각이면 멈춘다(위에서 다시 떨어뜨리지 않아 돌출부 밑 조각도 그대로다).
+// 바뀐 조각이 없을 때까지 되풀이한다. exceptIndex 번째(끄는 중인 조각)는 움직이지 않지만 받침은 된다.
+// 새 배열을 돌려준다. 움직이지 않은 조각은 같은 객체, 움직인 조각은 pos 만 바꾼 새 객체다.
+export function settleAll(pieces, exceptIndex = -1) {
+  const out = pieces.slice();
+  for (let changed = true; changed;) {
+    changed = false;
+    const order = out.map((_, i) => i).filter((i) => i !== exceptIndex)
+      .sort((a, b) => out[a].pos[1] - out[b].pos[1]);
+    for (const i of order) {
+      const p = out[i];
+      const occ = occupiedSet(out, i);
+      const [x, , z] = p.pos;
+      let y = p.pos[1];
+      while (y > 0 && p.cells.every((c) => !occ.has(key([c[0] + x, c[1] + y - 1, c[2] + z])))) y--;
+      if (y !== p.pos[1]) {
+        out[i] = { ...p, pos: [x, y, z] };
+        changed = true;
+      }
+    }
+  }
+  return out;
+}

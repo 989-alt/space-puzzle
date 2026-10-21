@@ -128,6 +128,17 @@ if (!renderer) {
     selected: null,
     pieceTargetY: (i) => world.pieceTarget(i)[1],
     lastRing: () => window.__ck.input.ringState(),
+    // 중력 확인용: [[i, cells, pos], ...] 로 조각을 바꾸고 다시 그린다
+    place(list) {
+      for (const [i, cells, pos] of list) pieces[i] = { cells, pos, color: pieces[i].color };
+      world.setPieces(pieces);
+    },
+    // 판 좌표 점의 화면(클라이언트) 좌표
+    project(x, y, z) {
+      v.copy(world.toWorld(x, y, z)).project(camera);
+      const r = canvas.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    },
   };
   window.__ck.input = attachInput({
     canvas, stage, world,
