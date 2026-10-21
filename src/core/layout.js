@@ -40,11 +40,12 @@ export function clampInside(cells, x, z, center) {
   return [px, pz];
 }
 
-// 시작 각도(앞이 90도). 3개: 왼·앞·오른, 4개: 왼·왼앞·오른앞·오른, 5개: 왼·왼앞·앞·오른앞·오른.
+// 시작 각도(앞이 90도, 뒤가 270도). 앞(90도)은 "앞" 표시 통로라 비우고 좌우 대칭으로 둔다.
+// 3개: 왼·오른·뒤, 4개: 왼·왼앞·오른앞·오른, 5개: 왼·왼앞·오른앞·오른·뒤.
 export function startAngles(n) {
-  if (n === 3) return [180, 90, 0];
+  if (n === 3) return [180, 0, 270];
   if (n === 4) return [180, 135, 45, 0];
-  if (n === 5) return [180, 135, 90, 45, 0];
+  if (n === 5) return [180, 135, 45, 0, 270];
   // 그 밖의 개수는 왼쪽(180)에서 오른쪽(0)까지 앞쪽 반원에 고르게 둔다.
   if (n === 1) return [90];
   return Array.from({ length: n }, (_, i) => 180 - (180 * i) / (n - 1));
@@ -80,12 +81,13 @@ function spotsFor(cells, forbidden, center, goal, limit) {
 
 const NODE_LIMIT = 20000;
 const SPOTS_PER_VARIANT = 6;
+const VARIANT_PENALTY = 0.75; // 정해진 눕힌 방향을 조금 더 선호
 
 // 조각들의 시작 자리. 각 조각을 rng 로 1~3번 무작위로 돌린 뒤 눕히고(앞·뒤 각도는 긴 변이 x,
 // 옆 각도는 z), 작업대 안(fits)에서 판 칸+둘레 1칸, 이미 놓은 조각+둘레 1칸을 피하는 정수 위치 중
 // 목표 각도 지점에 가장 가까운 곳을 고른다. 목표 지점 근처에 없으면 창 전체에서 가장 가까운 곳을
 // 찾는다. 앞 조각이 자리를 다 막아 뒤 조각이 들어갈 곳이 없으면(5x4 판 등) 되돌아가서 앞 조각의
-// 다음 후보 자리, 그다음 다른 눕힌 방향으로 다시 시도한다(되돌림은 필요할 때만, 첫 선택은 항상 가장 가까운 자리).
+// 다음 후보 자리를 시도한다. 후보는 모든 눕힌 방향을 섞어 (거리 + 방향 순서 벌점 0.75) 순이다.
 // 끝내 안 되면 칸 수를 담은 Error 를 던진다. -> [{cells, x, z}] (y 는 dropY 로 따로 구한다)
 export function placeStarts(pieceCellsList, fp, rng) {
   const center = boardCenter(fp);
@@ -122,37 +124,53 @@ export function placeStarts(pieceCellsList, fp, rng) {
     return { rad, list };
   });
 
+  // 처음 찾은 배치(각 조각이 가장 가까운 자리)에서 멈추지 않고, 노드 한도 안에서 비용 합
+  // (목표까지 거리 + 방향 벌점)이 더 작은 배치를 계속 찾는다(가지치기). 조각이 많아 자리가
+  // 빠듯할 때 한 조각이 엉뚱한 쪽으로 밀려나는 일을 줄인다.
   let nodes = 0;
   const chosen = [];
-  function place(i, forbidden) {
-    if (i === n) return true;
+  let best = null;
+  let bestCost = Infinity;
+  function place(i, forbidden, cost = 0) {
+    if (cost >= bestCost) return false;
+    if (i === n) {
+      best = chosen.slice(0, n);
+      bestCost = cost;
+      return false; // 계속 찾는다
+    }
     const { rad, list } = variants[i];
+    // 모든 눕힌 방향의 후보 자리를 한데 모아 (목표까지 거리 + 방향 순서 벌점) 순으로 시도한다.
+    // 첫 방향이 목표 근처에 들어가지 못하면 다른 방향이 목표 자리에 놓인다(멀리 밀려나지 않게).
+    const cands = [];
     for (let v = 0; v < list.length; v++) {
       const cells = list[v];
       const [w, , d] = dims(cells);
       const goal = [center.x + START_R * Math.cos(rad) - w / 2, center.z + START_R * Math.sin(rad) - d / 2];
       const { cols, spots } = spotsFor(cells, forbidden, center, goal, SPOTS_PER_VARIANT);
-      for (const s of spots) {
-        if (++nodes > NODE_LIMIT) return false;
-        const next = new Set(forbidden);
-        addWithRing(next, cols.map(([cx, cz]) => [s.x + cx, s.z + cz]));
-        chosen[i] = { cells, x: s.x, z: s.z };
-        if (place(i + 1, next)) return true;
-      }
+      for (const s of spots) cands.push({ cells, cols, x: s.x, z: s.z, cost: s.dist + VARIANT_PENALTY * v });
+    }
+    cands.sort((a, b) => a.cost - b.cost); // 안정 정렬: 같으면 앞 방향·가까운 자리 먼저
+    for (const c of cands) {
+      if (cost + c.cost >= bestCost) break; // 정렬돼 있으니 뒤는 더 비싸다
+      if (++nodes > NODE_LIMIT) return false;
+      const next = new Set(forbidden);
+      addWithRing(next, c.cols.map(([cx, cz]) => [c.x + cx, c.z + cz]));
+      chosen[i] = { cells: c.cells, x: c.x, z: c.z };
+      place(i + 1, next, cost + c.cost);
     }
     return false;
   }
 
-  let ok = place(0, withLabel);
-  if (!ok) {
+  place(0, withLabel);
+  if (!best) {
     nodes = 0;
-    ok = place(0, base);
+    place(0, base);
   }
-  if (!ok) {
+  if (!best) {
     const cnt = pieceCellsList.map((c) => c.length).join('+');
     throw new Error(`작업대에 조각(${cnt}칸, 판 ${fp.w}x${fp.d})을 모두 놓을 자리가 없습니다`);
   }
-  return chosen.slice(0, n);
+  return best;
 }
 
 // others: 움직이는 조각 자신을 뺀 나머지. pieces 에 piece 자신이 (같은 객체로) 들어 있어도 된다.

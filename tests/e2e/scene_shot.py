@@ -22,6 +22,9 @@ SHOTS = [
     ("scene-1366-ring.png", "?noPerf&debugRing", (1366, 768)),
     ("scene-1024-ring.png", "?noPerf&debugRing", (1024, 768)),
     ("scene-spin.png", "?noPerf&puzzle=proto&spin=0.7", (1120, 700)),
+    ("scene-4p.png", "?noPerf&puzzle=s3-001", (1120, 700)),
+    ("scene-5p.png", "?noPerf&puzzle=s4-006", (1120, 700)),
+    ("scene-5p-014.png", "?noPerf&puzzle=s4-014", (1120, 700)),
 ]
 
 

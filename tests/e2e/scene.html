@@ -53,8 +53,10 @@ async function loadPuzzle() {
       [[0, 1, 0], [1, 1, 0], [1, 0, 0], [2, 0, 0]],
     ] };
   }
-  const bank = await (await fetch('../../data/puzzles-s1.json')).json();
-  return bank.find((p) => p.id === (qs.get('puzzle') || 's1-001')) || bank[0];
+  const id = qs.get('puzzle') || 's1-001';
+  const stage = (/^s([1-4])-/.exec(id) || [0, '1'])[1];
+  const bank = await (await fetch(`../../data/puzzles-s${stage}.json`)).json();
+  return bank.find((p) => p.id === id) || bank[0];
 }
 
 const stage = document.getElementById('stage');

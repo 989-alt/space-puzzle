@@ -28,9 +28,10 @@ const near = (a, b) => Math.abs(a[0] - b[0]) <= 1 && Math.abs(a[1] - b[1]) <= 1;
 test('constants and helpers', () => {
   assert.equal(ISLAND_R, 6);
   assert.deepEqual(boardCenter({ w: 5, d: 4 }), { x: 2.5, z: 2 });
-  assert.deepEqual(startAngles(3), [180, 90, 0]);
+  // 앞(90도)은 "앞" 표시 통로라 비우고 좌우 대칭으로 둔다(R14). 270 = 뒤.
+  assert.deepEqual(startAngles(3), [180, 0, 270]);
   assert.deepEqual(startAngles(4), [180, 135, 45, 0]);
-  assert.deepEqual(startAngles(5), [180, 135, 90, 45, 0]);
+  assert.deepEqual(startAngles(5), [180, 135, 45, 0, 270]);
 });
 
 test('fits checks all four corners against r - 0.15', () => {
@@ -97,7 +98,7 @@ test('starts never overlap board ring or each other, all fit (all 160 puzzles x 
   assert.deepEqual(failed, []);
 });
 
-test('starts are tidy: first piece on the left, last on the right, lying flat', () => {
+test('starts are tidy: left, right, back (long side along x)', () => {
   const p = bank.find((e) => e.id === 's1-001');
   const fp = footprint(p.target);
   const center = boardCenter(fp);
@@ -107,8 +108,10 @@ test('starts are tidy: first piece on the left, last on the right, lying flat', 
     return [s.x + w / 2, s.z + d / 2];
   };
   assert.ok(mid(st[0])[0] < center.x, 'angle 180 is left');
-  assert.ok(mid(st[2])[0] > center.x, 'angle 0 is right');
-  assert.ok(mid(st[1])[1] > center.z, 'angle 90 is front');
+  assert.ok(mid(st[1])[0] > center.x, 'angle 0 is right');
+  assert.ok(mid(st[2])[1] < center.z, 'angle 270 is back');
+  const [w2, , d2] = dims(st[2].cells);
+  assert.ok(w2 >= d2, 'back piece lies along x');
 });
 
 test('starts are deterministic for a seed', () => {
