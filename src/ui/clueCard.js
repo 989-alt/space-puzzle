@@ -1,7 +1,7 @@
 // 단서 카드 그리기. clue = clueFor(target, level) 결과({level, fp, counts?, layers?, top?, front?, side?}).
 // 크기는 모두 cqw(게임 화면 너비의 1%). 카드는 너비 18cqw, 안쪽 너비 약 15.5cqw.
 const INNER = 15.5; // 카드 안쪽 너비(cqw) = 18 − 좌우 여백 .7×2 − 테두리 .35×2 − 여유
-const SHORT = ['', '3D 모양', '위에서 본 모양 · 수', '층별 단서', '위·앞·옆에서 본 모양'];
+const SHORT = ['', '3D 모양', '위에서 본 모양 · 수', '층별 모양', '위·앞·옆에서 본 모양'];
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -36,7 +36,7 @@ function level1() {
   const ic = el('div', 'lead-ic');
   ic.innerHTML = '<svg aria-hidden="true" style="color:#2FC8F0"><use href="#i-box"/></svg>';
   const p = el('div', 'cap lead');
-  p.append('판 위에 ', el('b', '', '빛나는 모양'), '을', document.createElement('br'), '그대로 채워요');
+  p.append('판 위의 ', el('b', '', '빛나는 모양'), '을', document.createElement('br'), '그대로 채워요');
   return [ic, p];
 }
 
