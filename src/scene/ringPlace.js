@@ -40,9 +40,30 @@ const CANDS = (() => {
       out.push({ dx, dy, k: 1, layout: 'row', base: Math.hypot(dx, dy) + ROW_COST });
     }
   }
+  return sortCands(out);
+})();
+function sortCands(out) {
   const L = { tri: 0, row: 1 };
   return out.sort((a, b) => a.base - b.base || L[a.layout] - L[b.layout] || a.k - b.k || a.dy - b.dy || a.dx - b.dx);
-})();
+}
+// 가까운 후보(SPAN) 중 버튼이 아무것도 덮지 않는 자리가 없을 때만 더 멀리(WIDE_SPAN) 찾는다.
+// 예: 세운 조각이 화면에서 키가 크고 양옆에 다른 조각이 있으면 SPAN 안 자리는 모두 버튼이 고른 조각을 덮었다
+// (2026-10-22 2차 브라우저 감사 s2-006: 그 버튼에 조각 누름이 떨어져 한 번 더 돌아감).
+const WIDE_SPAN = 360;
+let WIDE = null;
+const wideCands = () => {
+  if (WIDE) return WIDE;
+  const out = [];
+  for (let dx = -WIDE_SPAN; dx <= WIDE_SPAN; dx += STEP) {
+    for (let dy = -WIDE_SPAN; dy <= WIDE_SPAN; dy += STEP) {
+      if (Math.abs(dx) <= SPAN && Math.abs(dy) <= SPAN) continue; // 가까운 후보에서 이미 봤다
+      out.push({ dx, dy, k: 1, layout: 'tri', base: Math.hypot(dx, dy) });
+      out.push({ dx, dy, k: 1, layout: 'row', base: Math.hypot(dx, dy) + ROW_COST });
+    }
+  }
+  WIDE = sortCands(out);
+  return WIDE;
+};
 
 // 버튼 하나의 링 가운데 기준 위치(px)
 export function buttonOffset(b, { k = 1, layout = 'tri' } = {}) {
@@ -116,17 +137,29 @@ export function placeRing({ boxes, sel, tap, W, H, prev = null, ui = [] }) {
   }
   const ax = Number.isFinite(l) ? (l + r) / 2 : tap.x;
   const ay = Number.isFinite(t) ? (t + b) / 2 : tap.y;
-  let best = null;
-  let bestScore = Infinity;
-  for (const c of CANDS) {
-    if (c.base >= bestScore) break; // 정렬돼 있으니 뒤는 더 비싸다
-    const ring = { x: ax + c.dx, y: ay + c.dy, k: c.k, layout: c.layout };
-    const parts = ringParts(ring);
-    if (!fitsScreen(parts, W, H)) continue;
-    const score = c.base + hitScore(parts, boxes, sel, ui);
-    if (score < bestScore) { best = ring; bestScore = score; }
+  const search = (cands) => {
+    let best = null;
+    let bestScore = Infinity;
+    let bestHit = Infinity;
+    for (const c of cands) {
+      if (c.base >= bestScore) break; // 정렬돼 있으니 뒤는 더 비싸다
+      const ring = { x: ax + c.dx, y: ay + c.dy, k: c.k, layout: c.layout };
+      const parts = ringParts(ring);
+      if (!fitsScreen(parts, W, H)) continue;
+      const hit = hitScore(parts, boxes, sel, ui);
+      if (c.base + hit < bestScore) { best = ring; bestScore = c.base + hit; bestHit = hit; }
+    }
+    return { best, hit: bestHit };
+  };
+  let found = search(CANDS);
+  if (found.hit >= 200) { // 버튼이 무언가를 덮는다: 더 멀리서 덮지 않는 자리를 찾는다
+    for (const c of wideCands()) { // 가까운 순으로 첫 번째 깨끗한 자리
+      const ring = { x: ax + c.dx, y: ay + c.dy, k: c.k, layout: c.layout };
+      const parts = ringParts(ring);
+      if (fitsScreen(parts, W, H) && hitScore(parts, boxes, sel, ui) < 200) { found = { best: ring, hit: 0 }; break; }
+    }
   }
-  if (best) return best;
+  if (found.best) return found.best;
   // 화면이 아주 작아 어디에도 다 들어가지 않으면 누른 점을 화면 안으로 끌어당긴다(예전 방식)
   const ext = {
     left: Math.max(...RING_BUTTONS.map((q) => Math.max(BTN / 2, LABEL_HALF_W) - q.dx)) + EDGE,

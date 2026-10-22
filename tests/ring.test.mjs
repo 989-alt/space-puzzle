@@ -147,3 +147,27 @@ test('a kept ring that now overlaps UI is moved', () => {
   const r = placeRing({ boxes, sel: 0, tap: { x: 940, y: 220 }, W, H, ui, prev });
   assert.equal(uiHits(r, ui), 0);
 });
+
+// 2차 브라우저 감사(s2-006): 세운 조각(화면에서 키가 큼) 양옆·아래에 다른 조각이 있어 가까운 자리(SPAN)가 모두
+// 버튼으로 고른 조각을 덮었다. 그 버튼에 조각 누름이 떨어져 한 번 더 돌아갔다. 이제 더 멀리 덮지 않는 자리를 찾는다.
+test('tall standing piece boxed in by neighbours gets a clear ring farther away', () => {
+  const boxes = [
+    { i: 0, l: 561, t: 302, r: 640, b: 408 }, { i: 0, l: 640, t: 302, r: 719, b: 408 },
+    { i: 0, l: 640, t: 234, r: 721, b: 342 }, { i: 0, l: 715, t: 302, r: 798, b: 408 },
+    { i: 1, l: 853, t: 227, r: 938, b: 327 }, { i: 1, l: 857, t: 163, r: 944, b: 263 },
+    { i: 1, l: 861, t: 95, r: 950, b: 197 }, { i: 1, l: 924, t: 227, r: 1012, b: 327 },
+    { i: 2, l: 723, t: 432, r: 815, b: 551 }, { i: 2, l: 806, t: 432, r: 903, b: 551 },
+    { i: 2, l: 880, t: 386, r: 979, b: 500 }, { i: 2, l: 888, t: 432, r: 991, b: 551 },
+  ];
+  // 그때 화면 UI(1280x800 게임 화면): 위쪽 칩·섬 배지·미션·점수·단서 카드·도구 막대
+  const ui = [
+    { l: 26, t: 19, r: 227, b: 59 }, { l: 26, t: 84, r: 253, b: 153 }, { l: 320, t: 21, r: 960, b: 80 },
+    { l: 1140, t: 19, r: 1254, b: 73 }, { l: 1024, t: 88, r: 1254, b: 358 }, { l: 906, t: 710, r: 1254, b: 776 },
+  ];
+  const ring = placeRing({ boxes, sel: 1, tap: { x: 899, y: 212 }, W, H, ui });
+  assert.equal(buttonHits(ring, boxes), 0, JSON.stringify(ring));
+  assert.equal(buttonHits(ring, ui), 0, JSON.stringify(ring));
+  assert.ok(inside(ring));
+  // 한 번 고른 자리는 다시 돌린 뒤에도 그대로(prev 유지)
+  assert.deepEqual(placeRing({ boxes, sel: 1, tap: { x: 899, y: 212 }, W, H, prev: ring, ui }), ring);
+});
