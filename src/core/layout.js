@@ -226,6 +226,33 @@ export function movePiece(piece, x, z, pieces, center) {
   return settle(piece.cells, x, z, without(pieces, piece), center);
 }
 
+// ---------- 끌기 ----------
+// 예전 끌기는 바닥(y=0) 평면에서 손가락 아래 점을 따라가, 쌓인 조각 윗면을 가리켜도 조각이 그 뒤 바닥으로
+// 가거나(카메라가 약 35도로 내려다봐 한 층 높을 때마다 1.4칸씩 어긋남) 지나가는 조각 위로 뛰어올랐다.
+// 이제 잡은 점(조각 위의 점)이 손가락 광선 위에 오는 자리를 높이마다 구해, 그 자리에 떨어뜨린 높이가 그 높이와
+// 같은(실제로 거기 놓일 수 있는) 자리만 후보로 둔다. 후보 중 칸에 맞춘 잡은 점이 손가락 점에 가장 가까운 자리
+// (화면에서 손가락 바로 아래로 보이는 자리, 같으면 높은 쪽)로 간다. 그래서 윗면을 가리키면 그 위에, 벽 뒤 바닥을
+// 가리키면 그 바닥에 놓이고, 잡자마자 다른 높이로 튀지 않는다(잡은 자리는 오차 0).
+// 후보가 없으면(손가락이 벽 앞면을 가리킴) null 을 돌려주고 조각은 그 자리에 둔다.
+// pointAt(y): 손가락 광선이 판 좌표 높이 y 의 수평면과 만나는 점 {x, z}(없으면 null).
+// grab: {off: [ox, oz], gy} 잡은 점 = (pos.x + ox, pos.y + gy, pos.z + oz).
+export function dragStep(piece, pointAt, grab, pieces, center) {
+  const occ = occupiedSet(without(pieces, piece), -1);
+  let top = -1;
+  for (const k of occ) top = Math.max(top, Number(k.split(',')[1]));
+  let best = null;
+  let bestE = Infinity;
+  for (let h = top + 1; h >= 0; h--) {
+    const f = pointAt(h + grab.gy);
+    if (!f) continue;
+    const [x, z] = clampInside(piece.cells, Math.round(f.x - grab.off[0]), Math.round(f.z - grab.off[1]), center);
+    if (dropY(piece.cells, x, z, occ) !== h) continue;
+    const e = Math.hypot(x + grab.off[0] - f.x, z + grab.off[1] - f.z);
+    if (e < bestE - 1e-9) { best = { cells: piece.cells, pos: [x, h, z] }; bestE = e; }
+  }
+  return best;
+}
+
 // ---------- 돌리기 ----------
 // 예전에는 최소 모서리(pos x, z)를 고정하고 돌린 뒤 위에서 떨어뜨려, 돌린 모양이 옆 조각과 겹치면 그 위로
 // 올라탔다(2026-10-22 감사: 판 위 회전 4.5%, 판 밖 회전 3.2%가 판 칸으로 들어감). 이제는

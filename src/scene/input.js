@@ -1,9 +1,9 @@
 // 입력: 조각 끌기, 톡 누르기·길게 누르기 → 돌리기 링(버튼 3개), 빈 곳 끌기·두 손가락 → 회전판.
 // 포인터 이벤트 하나로 터치(학교 태블릿·크롬북)와 마우스(교사 PC)를 함께 처리한다.
-// 조각 좌표는 판 좌표다. 끌기·돌리기 결과는 movePiece/rotatePiece 로 만들고(작업대 안, 위에서 떨어뜨림.
+// 조각 좌표는 판 좌표다. 끌기·돌리기 결과는 dragStep/movePiece/rotatePiece 로 만들고(작업대 안, 위에서 떨어뜨림.
 // 돌리기는 제자리에서 돌고 옆 조각과 겹치면 같은 높이의 가까운 빈 자리로 비킨다)
 // setPiece(i, piece) 로 넘긴 뒤 world.updatePiece 로 화면에 반영한다. 그 뒤 settleAll 로 받침이 빠진 조각을 떨어뜨린다.
-import { movePiece, rotatePiece } from '../core/layout.js';
+import { movePiece, rotatePiece, dragStep } from '../core/layout.js';
 import { settleAll } from '../core/board.js';
 import { placeRing, buttonOffset, BTN, RING_BUTTONS as RING_GEOM, LABEL_GAP } from './ringPlace.js';
 
@@ -77,7 +77,7 @@ export function attachInput({
   stage.appendChild(ring);
 
   const ptrs = new Map(); // pointerId -> {x, y, t(마지막 down/move 시각)}
-  let drag = null; // {i, id, sx, sy, off:[x,z], moved, longShown}
+  let drag = null; // {i, id, sx, sy, grab:{off:[x,z], gy}, moved, longShown}
   let spin = null; // {x, moved}
   let timer = 0;
   let selected = null;
@@ -139,14 +139,15 @@ export function attachInput({
     });
   }
 
-  // 끌기 중 한 번 옮기기(판 좌표, 정수로 반올림 후 movePiece)
+  // 끌기 중 한 번 옮기기: 잡은 점이 손가락 아래에 오는 자리(core/layout.js dragStep). 높이마다 손가락 광선과
+  // 그 높이 수평면이 만나는 점을 쓰므로, 쌓인 조각 윗면을 가리키면 그 위로 간다(바닥 평면만 쓰면 한 층마다
+  // 약 1.4칸 뒤로 어긋났다). 놓일 자리가 없으면(벽 앞면을 가리킴) 지금 자리에 둔다.
   function dragTo(x, y) {
-    const f = world.floorPoint(ndcOf(x, y));
-    if (!f) return;
+    const ndc = ndcOf(x, y);
     const pieces = getPieces();
     const p = pieces[drag.i];
     if (!p) return; // 문제가 바뀌어 조각이 없어졌다
-    const next = movePiece(p, Math.round(f.x - drag.off[0]), Math.round(f.z - drag.off[1]), pieces, world.center());
+    const next = dragStep(p, (h) => world.planePoint(ndc, h), drag.grab, pieces, world.center()) || p;
     setPiece(drag.i, next);
     world.updatePiece(drag.i, next, { lift: true });
     settle(drag.i); // 끄는 조각이 떠난 자리 위 조각은 내려온다
@@ -207,13 +208,13 @@ export function attachInput({
       spin.moved = true; // 두 손가락은 탭이 아니다
       return;
     }
-    const i = world.pickPiece(ndcOf(e.clientX, e.clientY));
-    if (i < 0) { startSpin(); return; }
-    const p = getPieces()[i];
-    const f = world.floorPoint(ndcOf(e.clientX, e.clientY));
+    const hit = world.pickHit(ndcOf(e.clientX, e.clientY));
+    if (!hit) { startSpin(); return; }
+    const { i, point, at } = hit;
+    // 잡은 점: 맞은 점을 조각이 그려진 자리 기준으로(끄는 동안 이 점이 손가락 아래에 온다)
     drag = {
       i, id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, longShown: false,
-      off: f ? [f.x - p.pos[0], f.z - p.pos[2]] : [0, 0],
+      grab: { off: [point.x - at.x, point.z - at.z], gy: point.y - at.y },
     };
     const { clientX, clientY } = e;
     timer = setTimeout(() => {

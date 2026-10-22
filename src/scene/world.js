@@ -272,6 +272,29 @@ export function createWorld(renderer, scene, camera) {
     return hit ? hit.object.userData.pieceIndex : -1;
   }
 
+  // 화면 점(ndc) 아래 조각과 맞은 점(판 좌표), 그 조각이 지금 그려진 자리(판 좌표, 움직이는 중이면 그 위치).
+  // 끌기에서 잡은 점 = 맞은 점 − 그려진 자리. 없으면 null.
+  function pickHit(ndc) {
+    aim(ndc);
+    const hit = ray.intersectObjects(entries.flatMap((e) => e.hits), false)[0];
+    if (!hit) return null;
+    const i = hit.object.userData.pieceIndex;
+    const p = grid.worldToLocal(hit.point.clone());
+    const g = entries[i].group.position;
+    return { i, point: { x: p.x, y: p.y, z: p.z }, at: { x: g.x, y: g.y, z: g.z } };
+  }
+
+  // 화면 점(ndc) 광선이 판 좌표 높이 y 의 수평면과 만나는 점 {x, z}(판 좌표). 회전판·판 이동은 수평이라 높이는 그대로다.
+  const level = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  function planePoint(ndc, y) {
+    aim(ndc);
+    level.constant = -y;
+    const v = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(level, v)) return null;
+    grid.worldToLocal(v);
+    return { x: v.x, z: v.z };
+  }
+
   // 화면 점(ndc) 아래 바닥(y=0)의 판 좌표
   function floorPoint(ndc) {
     aim(ndc);
@@ -371,7 +394,9 @@ export function createWorld(renderer, scene, camera) {
     setSpin: (rad) => { turntable.rotation.y = rad; dirty = true; },
     getSpin: () => turntable.rotation.y,
     pickPiece,
+    pickHit,
     floorPoint,
+    planePoint,
     cubeBoxes,
     bounce: (i) => { if (entries[i]) { entries[i].bounce = 1; dirty = true; } },
     shakeBoard: () => { shakeT = SHAKE_TIME; dirty = true; },

@@ -389,7 +389,42 @@ def drag_support_away_top_lands(page, ptr):
     assert is_int(target_y(page, 2)) and target_y(page, 2) == 0, f"top piece target {target_y(page, 2)}"
 
 
-TESTS = [drag_moves_piece, drag_support_away_top_lands, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
+def _place_slab(page, cells0, pos0):
+    """0번 = 끌 조각, 1번 = 판 위 3x2 받침(높이 1, x 1..3, z 0..1), 2번 = 멀리."""
+    page.evaluate(f"""() => __ck.place([
+        [0, {cells0}, {pos0}],
+        [1, [[0,0,0],[1,0,0],[2,0,0],[0,0,1],[1,0,1],[2,0,1]], [1,0,0]],
+        [2, [[0,0,0]], [6,0,-2]]])""")
+    page.wait_for_timeout(300)
+
+
+def drag_onto_stack_top(page, ptr):
+    """쌓인 조각 윗면을 가리키며 끌면 그 위에 놓인다(예전: 바닥 평면 기준이라 받침 뒤 바닥으로 감)."""
+    _place_slab(page, "[[0,0,0]]", "[-2,0,3]")
+    for goal in ([1, 1, 0], [3, 1, 1]):
+        p = pieces(page)[0]["pos"]
+        a = page.evaluate(f"__ck.project({p[0]} + 0.5, {p[1]} + 1, {p[2]} + 0.5)")
+        b = page.evaluate(f"__ck.project({goal[0]} + 0.5, {goal[1]} + 1, {goal[2]} + 0.5)")
+        ptr.drag((a["x"], a["y"]), (b["x"], b["y"]), steps=20)
+        page.wait_for_timeout(300)
+        assert pieces(page)[0]["pos"] == goal, f"landed {pieces(page)[0]['pos']} want {goal}"
+        assert is_int(target_y(page, 0)) and target_y(page, 0) == goal[1]
+
+
+def drag_behind_and_off_stack(page, ptr):
+    """받침 뒤 바닥을 가리키면 그 바닥에, 받침 위 조각을 앞 바닥으로 끌면 바닥에 놓인다(떠 있지 않음)."""
+    _place_slab(page, "[[0,0,0]]", "[-2,0,3]")
+    for goal in ([2, 0, -2], [2, 1, 1], [0, 0, 3]):
+        p = pieces(page)[0]["pos"]
+        a = page.evaluate(f"__ck.project({p[0]} + 0.5, {p[1]} + 1, {p[2]} + 0.5)")
+        b = page.evaluate(f"__ck.project({goal[0]} + 0.5, {goal[1]} + 1, {goal[2]} + 0.5)")
+        ptr.drag((a["x"], a["y"]), (b["x"], b["y"]), steps=20)
+        page.wait_for_timeout(300)
+        assert pieces(page)[0]["pos"] == goal, f"landed {pieces(page)[0]['pos']} want {goal}"
+    assert pieces(page)[1]["pos"] == [1, 0, 0], "support moved"
+
+
+TESTS = [drag_moves_piece, drag_onto_stack_top, drag_behind_and_off_stack, drag_support_away_top_lands, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
          ring_does_not_cover_pieces,
          long_press_opens_ring, empty_tap_hides_ring, empty_drag_spins, cancel_mid_drag_lands,
          ghost_pointer_then_drag_moves]

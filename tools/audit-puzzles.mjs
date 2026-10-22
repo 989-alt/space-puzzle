@@ -11,7 +11,7 @@ import { worldCells, occupiedSet, dropY, settleAll } from '../src/core/board.js'
 import { clueFor, footprint, hasOverhang, height } from '../src/core/clues.js';
 import { judge } from '../src/core/judge.js';
 import { solve } from '../src/core/solver.js';
-import { boardCenter, placeStarts, movePiece, rotatePiece, fits } from '../src/core/layout.js';
+import { boardCenter, placeStarts, movePiece, rotatePiece, dragStep, fits } from '../src/core/layout.js';
 import { fitCamera } from '../src/scene/calibrate.js';
 import { renderClue } from '../src/ui/clueCard.js';
 
@@ -160,12 +160,6 @@ function uiRotate(pieces, i, axis, center, board) {
   ps[i] = rotatePiece(pieces[i], axis, pieces, center, board);
   return settleAll(ps);
 }
-// input.js dragTo: movePiece(반올림한 정수 x, z) -> setPiece -> settle(drag.i)
-function uiDragStep(pieces, i, x, z, center) {
-  const ps = pieces.slice();
-  ps[i] = movePiece(pieces[i], x, z, pieces, center);
-  return settleAll(ps, i);
-}
 // input.js land: 마지막 칸에서 movePiece 다시 -> settle()
 function uiLand(pieces, i, center) {
   const ps = pieces.slice();
@@ -173,13 +167,60 @@ function uiLand(pieces, i, center) {
   ps[i] = movePiece(p, p.pos[0], p.pos[2], pieces, center);
   return settleAll(ps);
 }
-// 끌기 한 번: 지금 자리에서 (tx, tz)까지 반올림된 정수 칸을 차례로 지나고 놓는다. direct 면 바로 그 칸으로.
-function uiDrag(pieces, i, tx, tz, center, direct = false) {
-  const [px, , pz] = pieces[i].pos;
-  const n = direct ? 1 : Math.max(1, Math.abs(tx - px), Math.abs(tz - pz));
+// 끌기 한 번(input.js onDown·dragTo·land): 게임 카메라(회전판 0)로 조각 윗면 한 점을 잡고, 그 점이 목표 자리에
+// 올 화면 점까지 손가락을 곧게(약 12px 마다) 옮긴다. 걸음마다 dragStep(null 이면 그대로) -> settleAll(except i),
+// 떼면 movePiece(같은 자리) -> settleAll. direct 면 바로 마지막 화면 점으로.
+// DRAG_MODE=old 이면 예전 끌기(바닥 평면)로 흉내 낸다(고치기 전과 비교용).
+const DRAG_MODE = process.env.DRAG_MODE || 'new';
+const rayc = new THREE.Raycaster();
+const ndcV = new THREE.Vector2();
+const planeV = new THREE.Vector3();
+function screenOf(x, y, z, center) {
+  const v = new THREE.Vector3(x - center.x, y, z - center.z).project(getGameCam());
+  return [((v.x + 1) / 2) * W, ((1 - v.y) / 2) * H];
+}
+function fingerAt([sx, sy], center) {
+  ndcV.set((sx / W) * 2 - 1, -(sy / H) * 2 + 1);
+  rayc.setFromCamera(ndcV, getGameCam());
+  const ray = rayc.ray.clone();
+  return (y) => {
+    const hit = ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -y), planeV);
+    return hit ? { x: hit.x + center.x, z: hit.z + center.z } : null;
+  };
+}
+// 잡는 점: 가장 높은 쌓기나무 중 조각 가운데에 가까운 것의 윗면 가운데(조각 기준)
+function grabOf(cells) {
+  const top = Math.max(...cells.map((c) => c[1]));
+  const m = [0, 2].map((k) => cells.reduce((s, c) => s + c[k], 0) / cells.length);
+  const c = cells.filter((q) => q[1] === top)
+    .reduce((b, q) => (Math.hypot(q[0] - m[0], q[2] - m[1]) < Math.hypot(b[0] - m[0], b[2] - m[1]) ? q : b));
+  return { off: [c[0] + 0.5, c[2] + 0.5], gy: c[1] + 1 };
+}
+function uiDrag(pieces, i, goal, center, direct = false) {
+  const p0 = pieces[i];
+  const g = grabOf(p0.cells);
+  const a = screenOf(p0.pos[0] + g.off[0], p0.pos[1] + g.gy, p0.pos[2] + g.off[1], center);
+  const b = screenOf(goal[0] + g.off[0], goal[1] + g.gy, goal[2] + g.off[1], center);
+  const n = direct ? 1 : Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 12));
   let ps = pieces;
+  if (DRAG_MODE === 'old') { // 예전 끌기(바닥 평면 점 + 누른 곳 offset, movePiece) 비교용
+    const f0 = fingerAt(a, center)(0);
+    const off = [f0.x - p0.pos[0], f0.z - p0.pos[2]];
+    for (let k = 1; k <= n; k++) {
+      const f = fingerAt([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n], center)(0);
+      const q = ps.slice();
+      q[i] = movePiece(ps[i], Math.round(f.x - off[0]), Math.round(f.z - off[1]), ps, center);
+      ps = settleAll(q, i);
+    }
+    return uiLand(ps, i, center);
+  }
   for (let k = 1; k <= n; k++) {
-    ps = uiDragStep(ps, i, Math.round(px + ((tx - px) * k) / n), Math.round(pz + ((tz - pz) * k) / n), center);
+    const f = fingerAt([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n], center);
+    const next = dragStep(ps[i], f, g, ps, center);
+    if (!next) continue;
+    const q = ps.slice();
+    q[i] = next;
+    ps = settleAll(q, i);
   }
   return uiLand(ps, i, center);
 }
@@ -253,11 +294,11 @@ export function playOrder(p, sol, order, startPieces, { variant = 'rotateFirst',
     if (!path) return { ok: false, step, reason: `piece ${i}: orientation unreachable by ring buttons`, pieces: ps, stats };
     if (variant === 'rotateFirst') {
       for (const a of path) rot(a, i);
-      ps = uiDrag(ps, i, goal.pos[0], goal.pos[2], center, direct);
+      ps = uiDrag(ps, i, goal.pos, center, direct);
     } else {
-      ps = uiDrag(ps, i, goal.pos[0], goal.pos[2], center, direct);
+      ps = uiDrag(ps, i, goal.pos, center, direct);
       for (const a of path) rot(a, i);
-      ps = uiDrag(ps, i, goal.pos[0], goal.pos[2], center, direct);
+      ps = uiDrag(ps, i, goal.pos, center, direct);
     }
     const got = ps[i];
     if (!sameCells(got.cells, goal.cells)) {
@@ -628,7 +669,7 @@ function main() {
   ];
   console.log('검사                 | 문제 | 실패 | 문제 번호');
   for (const [n, c, f, l] of rows) console.log(`${n.padEnd(18)} | ${String(c).padStart(4)} | ${String(f).padStart(4)} | ${l}`);
-  console.log(`\nB: 실제 조작 흉내 ${B.reduce((s, r) => s + r.played, 0)}회, 시드 ${SEEDS.join(',')}`);
+  console.log(`\nB: 실제 조작 흉내 ${B.reduce((s, r) => s + r.played, 0)}회(실패 ${B.reduce((s, r) => s + r.fails.length, 0)}회), 시드 ${SEEDS.join(',')}`);
   console.log(`C: 해답 수 분포 ${J(hist(B.map((r) => r.solutions)))}`);
   console.log(`C: 가능한 순서 수(해답 중 최대) 분포 ${J(hist(B.map((r) => r.maxOrders)))}`);
   console.log(`C: 순서 10% 이하(1개 초과) ${few.length}문제: ${few.map((r) => `${r.id}(${r.maxOrders}/${r.totalOrders})`).join(' ')}`);
