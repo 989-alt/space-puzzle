@@ -77,11 +77,12 @@ function fitsScreen({ buttons, labels }, W, H) {
   return true;
 }
 
-// 겹침 점수: 다른 조각을 덮는 버튼(가장 나쁨) > 고른 조각을 덮는 버튼 > 쌓기나무를 가리는 글자(누르지는 않음)
-function hitScore(parts, boxes, sel) {
+// 겹침 점수: 다른 조각·화면 UI 를 덮는 버튼(가장 나쁨) > 고른 조각을 덮는 버튼 > 화면 UI 를 가리는 글자
+// > 쌓기나무를 가리는 글자(글자는 누르지 않으므로 가볍게). 200 미만이면 버튼·UI 겹침이 없다.
+function hitScore(parts, boxes, sel, ui = []) {
   let s = 0;
   for (const p of parts.buttons) {
-    let other = false;
+    let other = ui.some((u) => circleHits(p.x, p.y, BTN / 2 + PAD, u));
     let self = false;
     for (const b of boxes) {
       if (!circleHits(p.x, p.y, BTN / 2 + PAD, b)) continue;
@@ -91,17 +92,21 @@ function hitScore(parts, boxes, sel) {
     if (other) s += 1000;
     if (self) s += 300;
   }
-  for (const l of parts.labels) if (boxes.some((b) => rectHits(l, b))) s += 3;
+  for (const l of parts.labels) {
+    if (ui.some((u) => rectHits(l, u))) s += 200;
+    if (boxes.some((b) => rectHits(l, b))) s += 3;
+  }
   return s;
 }
 
 // boxes: [{i, l, t, r, b}] 쌓기나무 하나의 화면 사각형(스테이지 px), sel: 고른 조각 번호,
-// tap: 누른 점, W·H: 스테이지 크기, prev: 지금 떠 있는 링(있으면, 그대로 둬도 되면 그대로 돌려준다).
+// tap: 누른 점, W·H: 스테이지 크기, prev: 지금 떠 있는 링(있으면, 그대로 둬도 되면 그대로 돌려준다),
+// ui: [{l, t, r, b}] 링이 덮으면 안 되는 화면 UI 사각형(단서 카드·도구 막대·위쪽 칩 등, 스테이지 px).
 // -> {x, y, k, layout} 링 가운데(스테이지 px), 크기 배율, 모양('tri' | 'row')
-export function placeRing({ boxes, sel, tap, W, H, prev = null }) {
+export function placeRing({ boxes, sel, tap, W, H, prev = null, ui = [] }) {
   if (prev) {
     const parts = ringParts(prev);
-    if (fitsScreen(parts, W, H) && hitScore(parts, boxes, sel) < 300) return prev;
+    if (fitsScreen(parts, W, H) && hitScore(parts, boxes, sel, ui) < 200) return prev;
   }
   // 고른 조각 화면 사각형들의 가운데(없으면 누른 점)
   let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
@@ -118,7 +123,7 @@ export function placeRing({ boxes, sel, tap, W, H, prev = null }) {
     const ring = { x: ax + c.dx, y: ay + c.dy, k: c.k, layout: c.layout };
     const parts = ringParts(ring);
     if (!fitsScreen(parts, W, H)) continue;
-    const score = c.base + hitScore(parts, boxes, sel);
+    const score = c.base + hitScore(parts, boxes, sel, ui);
     if (score < bestScore) { best = ring; bestScore = score; }
   }
   if (best) return best;

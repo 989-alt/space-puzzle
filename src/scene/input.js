@@ -70,6 +70,7 @@ function buildRing(doc) {
 export function attachInput({
   canvas, stage, world, getPieces,
   setPiece = () => {}, onDrop = () => {}, onSelect = () => {}, onRotate = () => {},
+  getUiRects = () => [], // 링이 덮으면 안 되는 화면 UI 사각형(스테이지 px, {l, t, r, b})
 }) {
   const doc = canvas.ownerDocument;
   ensureStyle(doc);
@@ -93,7 +94,7 @@ export function attachInput({
     return s / ptrs.size;
   };
 
-  // 링 자리: 고른 조각 둘레에서 버튼이 어떤 쌓기나무도 덮지 않는 가장 가까운 곳(ringPlace.js).
+  // 링 자리: 고른 조각 둘레에서 버튼이 어떤 쌓기나무도, 화면 UI(getUiRects)도 덮지 않는 가장 가까운 곳(ringPlace.js).
   // prev 가 있으면(돌린 뒤) 버튼이 여전히 비어 있는 한 그 자리에 둔다(연달아 누르는 버튼이 도망가지 않게).
   function placeRingFor(i, x, y, prev = null) {
     const sr = stage.getBoundingClientRect();
@@ -103,7 +104,9 @@ export function attachInput({
     const boxes = (world.cubeBoxes ? world.cubeBoxes(getPieces()) : []).map((b) => ({
       i: b.i, l: ox + b.l * cr.width, r: ox + b.r * cr.width, t: oy + b.t * cr.height, b: oy + b.b * cr.height,
     }));
-    const at = placeRing({ boxes, sel: i, tap: { x: x - sr.left, y: y - sr.top }, W: sr.width, H: sr.height, prev });
+    const at = placeRing({
+      boxes, sel: i, tap: { x: x - sr.left, y: y - sr.top }, W: sr.width, H: sr.height, prev, ui: getUiRects(),
+    });
     ringAt = at;
     ring.style.left = `${at.x}px`;
     ring.style.top = `${at.y}px`;

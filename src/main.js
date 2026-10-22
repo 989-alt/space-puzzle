@@ -142,6 +142,7 @@ if (renderer) {
     setPiece: (i, p) => { if (pieces[i]) pieces[i] = { ...p, color: pieces[i].color }; },
     onDrop: () => check(),
     onRotate: () => check(),
+    getUiRects: () => ringUiRects(),
   });
   // 게임 화면이 보일 때(도움말이 위에 겹친 때 포함)만, 바뀐 것이 있을 때만 그린다(world.frame).
   // fps 는 게임 화면에서 움직임을 그린 프레임만 잰다. 겹친 화면(도움말의 흐림 효과)이 있으면 재지 않는다.
@@ -189,6 +190,24 @@ function uiRects() {
     const el = $(sel);
     if (!el || el.hidden) continue;
     const r = measureWithEasy(el);
+    if (r.width < 2 || r.height < 2) continue;
+    out.push({ l: r.left - base.left, t: r.top - base.top, r: r.right - base.left, b: r.bottom - base.top });
+  }
+  return out;
+}
+
+// 돌리기 링이 덮으면 안 되는 화면 UI: 위쪽 칩·섬 배지·미션·점수, 단서 카드(쉬운 단서 버튼 자리 포함), 도구 막대, 말풍선.
+// 링 버튼이 이 위에 놓이면 도구를 누르려던 손가락이 링 버튼을 누른다. 보이는 것만 잰다.
+const RING_UI_SELECTORS = ['.hud', '#islandBadge', '.mission', '.score', '#clueCard', '.tools', '#bubble'];
+function ringUiRects() {
+  const base = stage.getBoundingClientRect();
+  const out = [];
+  for (const sel of RING_UI_SELECTORS) {
+    const el = stage.querySelector(sel);
+    if (!el || el.hidden) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+    const r = sel === '#clueCard' ? measureWithEasy(el) : el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) continue;
     out.push({ l: r.left - base.left, t: r.top - base.top, r: r.right - base.left, b: r.bottom - base.top });
   }

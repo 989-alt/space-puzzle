@@ -109,3 +109,41 @@ test('placement is fast (< 15 ms for 5 pieces of 6 cubes)', () => {
   }
   assert.ok(worst < 15, `${worst.toFixed(1)}ms`);
 });
+
+// 화면 UI(단서 카드·도구 막대·위쪽 칩 등) 위에 링 버튼이 놓이면 그 UI 를 누르려던 손가락이 링 버튼을 누른다(F 와 같은 종류).
+const rectHit = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+function uiHits(ring, ui) {
+  const { buttons, labels } = ringParts(ring);
+  const bh = buttons.filter((p) => ui.some((u) => circleHitsRect(p.x, p.y, R, u))).length;
+  const lh = labels.filter((l) => ui.some((u) => rectHit(l, u))).length;
+  return bh + lh;
+}
+
+test('ring buttons and labels avoid UI overlays (clue card on the right, tools at the bottom)', () => {
+  const ui = [
+    { l: 1030, t: 88, r: 1260, b: 420 }, // 단서 카드
+    { l: 880, t: 700, r: 1255, b: 780 }, // 도구 막대
+    { l: 450, t: 20, r: 830, b: 80 }, // 미션
+  ];
+  // 단서 카드 바로 왼쪽 조각: 가장 가까운 링 자리는 카드 위에 걸친다
+  const boxes = row(0, 900, 200, 2);
+  const ring = placeRing({ boxes, sel: 0, tap: { x: 940, y: 220 }, W, H, ui });
+  assert.equal(uiHits(ring, ui), 0, JSON.stringify(ringParts(ring)));
+  assert.equal(buttonHits(ring, boxes), 0);
+  // 도구 막대 바로 위 조각
+  const low = row(0, 950, 600, 3);
+  const r2 = placeRing({ boxes: low, sel: 0, tap: { x: 1000, y: 620 }, W, H, ui });
+  assert.equal(uiHits(r2, ui), 0, JSON.stringify(ringParts(r2)));
+  assert.equal(buttonHits(r2, low), 0);
+  // UI 를 모르면(ui 없음) 같은 자리에서 카드와 겹치는 자리를 고를 수 있다(시험이 의미 있는지 확인)
+  const blind = placeRing({ boxes, sel: 0, tap: { x: 940, y: 220 }, W, H });
+  assert.ok(uiHits(blind, ui) > 0, 'scenario must be non-trivial');
+});
+
+test('a kept ring that now overlaps UI is moved', () => {
+  const ui = [{ l: 1030, t: 88, r: 1260, b: 420 }];
+  const boxes = row(0, 900, 200, 2);
+  const prev = placeRing({ boxes, sel: 0, tap: { x: 940, y: 220 }, W, H });
+  const r = placeRing({ boxes, sel: 0, tap: { x: 940, y: 220 }, W, H, ui, prev });
+  assert.equal(uiHits(r, ui), 0);
+});
