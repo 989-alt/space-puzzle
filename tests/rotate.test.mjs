@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { rotatePiece, fits, boardCenter, ISLAND_R } from '../src/core/layout.js';
 import { worldCells, settleAll, dropY, occupiedSet } from '../src/core/board.js';
 import { footprint } from '../src/core/clues.js';
-import { key, normalize } from '../src/core/pieces.js';
+import { key, normalize, orientations } from '../src/core/pieces.js';
 import { loadBanks, startState, mulberry32 } from '../tools/audit-puzzles.mjs';
 
 const center = { x: 2, z: 1.5 };
@@ -197,4 +197,48 @@ test('rotatePiece does not mutate its inputs', () => {
   rotatePiece(a, 'x', [a, b], center, new Set(['0,0']));
   assert.equal(JSON.stringify([a, b]), snap);
   assert.ok(ISLAND_R > 0);
+});
+
+test('regression: upright I4 beside the board (s3-008) never rotates into board cells', () => {
+  const p = bank.find((e) => e.id === 's3-008');
+  const fp = footprint(p.target);
+  const c = boardCenter(fp);
+  const i4 = [[0, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0]];
+  for (const z of [0, 1, 2]) {
+    const piece = { cells: i4, pos: [-3, 0, z] };
+    for (const axis of ['x', 'y', 'z']) {
+      const r = rotatePiece(piece, axis, [piece], c, fp.cells);
+      const w = worldCells(r);
+      assert.ok(!w.some((q) => fp.cells.has(`${q[0]},${q[2]}`)), `z=${z} ${axis} entered board ${JSON.stringify(r)}`);
+      assert.ok(fits(r.cells, r.pos[0], r.pos[2], c), `z=${z} ${axis} outside`);
+    }
+  }
+});
+
+test('off-board rotations anywhere on the workbench never enter the board (sampled sweep)', () => {
+  const bad = [];
+  let n = 0;
+  for (const p of bank.filter((_, k) => k % 8 === 0)) {
+    const fp = footprint(p.target);
+    const c = boardCenter(fp);
+    for (const src of p.pieces) {
+      for (const cells of orientations(src)) {
+        for (let x = -9; x <= 12; x += 1) {
+          for (let z = -9; z <= 12; z += 1) {
+            if (!fits(cells, x, z, c)) continue;
+            if (cells.some((q) => fp.cells.has(`${x + q[0]},${z + q[2]}`))) continue;
+            const piece = { cells, pos: [x, 0, z] };
+            for (const axis of ['x', 'y', 'z']) {
+              n++;
+              const r = rotatePiece(piece, axis, [piece], c, fp.cells);
+              if (worldCells(r).some((q) => fp.cells.has(`${q[0]},${q[2]}`))) bad.push(`${p.id} ${x},${z} ${axis}`);
+              if (!fits(r.cells, r.pos[0], r.pos[2], c)) bad.push(`${p.id} ${x},${z} ${axis} outside`);
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.ok(n > 50000, `rotations ${n}`);
+  assert.deepEqual(bad.slice(0, 10), []);
 });
