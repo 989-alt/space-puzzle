@@ -424,7 +424,30 @@ def drag_behind_and_off_stack(page, ptr):
     assert pieces(page)[1]["pos"] == [1, 0, 0], "support moved"
 
 
-TESTS = [drag_moves_piece, drag_onto_stack_top, drag_behind_and_off_stack, drag_support_away_top_lands, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
+def drag_grab_point_under_finger(page, ptr):
+    """끄는 중(떼기 전) 띄운 조각의 잡은 점(윗면 가운데)이 화면에서 손가락 아래에 있다.
+    예전에는 위로만 0.35 띄워 잡은 점이 손가락보다 위에 보였다. 놓이는 칸은 그대로다."""
+    _place_slab(page, "[[0,0,0]]", "[-2,0,3]")
+    for goal in ([0, 0, 3], [2, 1, 1]):
+        p = pieces(page)[0]["pos"]
+        a = page.evaluate(f"__ck.project({p[0]} + 0.5, {p[1]} + 1, {p[2]} + 0.5)")
+        b = page.evaluate(f"__ck.project({goal[0]} + 0.5, {goal[1]} + 1, {goal[2]} + 0.5)")
+        ptr.down(a["x"], a["y"])
+        page.wait_for_timeout(30)
+        ptr.move(b["x"], b["y"], steps=20, frm=(a["x"], a["y"]))
+        page.wait_for_timeout(400)  # 띄운 자리까지 따라가기를 기다린다
+        assert pieces(page)[0]["pos"] == goal, f"drag pos {pieces(page)[0]['pos']} want {goal}"
+        t = page.evaluate("__ck.world.pieceTarget(0)")
+        assert not is_int(t[1]), f"not lifted {t}"
+        g = page.evaluate(f"__ck.project({t[0]} + 0.5, {t[1]} + 1, {t[2]} + 0.5)")
+        d = ((g["x"] - b["x"]) ** 2 + (g["y"] - b["y"]) ** 2) ** 0.5
+        assert d < 2.5, f"grab point {d:.1f}px from finger"
+        ptr.up()
+        page.wait_for_timeout(300)
+        assert pieces(page)[0]["pos"] == goal, f"landed {pieces(page)[0]['pos']} want {goal}"
+
+
+TESTS = [drag_moves_piece, drag_onto_stack_top, drag_behind_and_off_stack, drag_grab_point_under_finger, drag_support_away_top_lands, drag_far_stays_inside, tap_opens_ring, ring_near_edge_not_clipped,
          ring_does_not_cover_pieces,
          long_press_opens_ring, empty_tap_hides_ring, empty_drag_spins, cancel_mid_drag_lands,
          ghost_pointer_then_drag_moves]

@@ -8,7 +8,10 @@ import { boardCenter, ISLAND_R } from '../core/layout.js';
 import { cellStatus } from '../core/ghost.js';
 import { key } from '../core/pieces.js';
 
-const LIFT = 0.35; // 끄는 중 조각을 띄우는 높이
+// 끄는 중 조각을 띄우는 거리. 위로만 띄우면 잡은 점이 손가락보다 약 0.35칸 위에 보였다(dragStep 은 띄우지 않은
+// 자리로 잡은 점을 맞춘다). 그래서 카메라 쪽(손가락 광선을 거슬러)으로 띄운다: 화면에서 잡은 점은 손가락 아래에
+// 그대로 있고, 조각은 위·앞으로 떠올라 보인다. 놓이는 칸은 dragStep 이 정한 그대로다.
+const LIFT = 0.35;
 const FRAME_PAD = 0.35; // 판 칸 둘레 보라 틀 폭
 const TRIM_PAD = 0.43; // 금테 폭
 const SHAKE_TIME = 0.45; // 판 흔들기(초)
@@ -244,6 +247,20 @@ export function createWorld(renderer, scene, camera) {
     updateMarks();
   }
 
+  // 끄는 조각을 카메라 쪽으로 LIFT 만큼 옮기는 벡터(판 좌표). 조각 가운데에서 카메라로 향한다.
+  const camLocal = new THREE.Vector3();
+  function liftOffset(piece) {
+    const n = piece.cells.length;
+    const c = new THREE.Vector3(
+      piece.pos[0] + piece.cells.reduce((s, q) => s + q[0], 0) / n + 0.5,
+      piece.pos[1] + piece.cells.reduce((s, q) => s + q[1], 0) / n + 0.5,
+      piece.pos[2] + piece.cells.reduce((s, q) => s + q[2], 0) / n + 0.5,
+    );
+    scene.updateMatrixWorld();
+    grid.worldToLocal(camera.getWorldPosition(camLocal));
+    return camLocal.sub(c).normalize().multiplyScalar(LIFT);
+  }
+
   // 조각 모양·위치를 바꾼다. lift 면 그 자리 위로 띄운다(끄는 중). 위치는 frame 에서 부드럽게 따라간다.
   function updatePiece(i, piece, { lift = false } = {}) {
     const e = entries[i];
@@ -252,7 +269,8 @@ export function createWorld(renderer, scene, camera) {
     if (piece.color !== undefined) { e.mat.color.set(piece.color); tintWrong(e); }
     e.pos = [...piece.pos];
     e.lifted = lift;
-    e.target.set(piece.pos[0], piece.pos[1] + (lift ? LIFT : 0), piece.pos[2]);
+    e.target.set(piece.pos[0], piece.pos[1], piece.pos[2]);
+    if (lift) e.target.add(liftOffset(piece));
     dirty = true;
     updateMarks();
   }
