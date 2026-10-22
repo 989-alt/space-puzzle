@@ -82,6 +82,21 @@ test('placement is deterministic and does not move when already clear', () => {
   assert.equal(buttonHits(moved, grown), 0);
 });
 
+test('a wide piece in front of placed pieces gets a ring that covers nothing (row layout below)', () => {
+  // 감사 F(s1-020) 실제 화면 사각형: 0·1번은 판 위에 놓였고 2번(4칸, 넓음)은 그 앞. 기본 모양은 2.2배까지 키워도
+  // 2번을 둘러쌀 수 없어 돌리기 버튼이 2번 위에 놓였고, 2번을 끌려던 누름이 버튼에 떨어졌다.
+  const boxes = [
+    { i: 0, l: 640, t: 342, r: 722, b: 453 }, { i: 0, l: 640, t: 274, r: 724, b: 386 }, { i: 0, l: 718, t: 342, r: 804, b: 453 },
+    { i: 1, l: 482, t: 302, r: 565, b: 408 }, { i: 1, l: 561, t: 302, r: 640, b: 408 }, { i: 1, l: 558, t: 342, r: 640, b: 453 },
+    { i: 1, l: 640, t: 302, r: 719, b: 408 }, { i: 1, l: 715, t: 302, r: 798, b: 408 },
+    { i: 2, l: 640, t: 432, r: 728, b: 551 }, { i: 2, l: 723, t: 432, r: 815, b: 551 }, { i: 2, l: 806, t: 432, r: 903, b: 551 },
+    { i: 2, l: 809, t: 361, r: 909, b: 482 },
+  ];
+  const ring = placeRing({ boxes, sel: 2, tap: { x: 767, y: 491 }, W, H });
+  assert.equal(buttonHits(ring, boxes), 0, JSON.stringify(ring));
+  assert.ok(inside(ring));
+});
+
 test('placement is fast (< 15 ms for 5 pieces of 6 cubes)', () => {
   const boxes = [];
   for (let i = 0; i < 5; i++) boxes.push(...row(i, 300 + i * 130, 300 + (i % 2) * 90, 6, 40));

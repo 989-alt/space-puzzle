@@ -5,7 +5,7 @@
 // setPiece(i, piece) 로 넘긴 뒤 world.updatePiece 로 화면에 반영한다. 그 뒤 settleAll 로 받침이 빠진 조각을 떨어뜨린다.
 import { movePiece, rotatePiece } from '../core/layout.js';
 import { settleAll } from '../core/board.js';
-import { placeRing, BTN, RING_BUTTONS as RING_GEOM, LABEL_GAP } from './ringPlace.js';
+import { placeRing, buttonOffset, BTN, RING_BUTTONS as RING_GEOM, LABEL_GAP } from './ringPlace.js';
 
 const DRAG_PX = 8; // 이보다 많이 움직여야 끌기
 const LONG_MS = 450; // 길게 누르기
@@ -110,10 +110,11 @@ export function attachInput({
     for (const b of RING_BUTTONS) {
       const btn = ring.querySelector(`button[data-axis="${b.axis}"]`);
       const small = ring.querySelector(`small[data-axis="${b.axis}"]`);
-      btn.style.left = `${b.dx * at.k}px`;
-      btn.style.top = `${b.dy * at.k}px`;
-      small.style.left = `${b.dx * at.k}px`;
-      small.style.top = `${b.dy * at.k + LABEL_GAP}px`;
+      const o = buttonOffset(b, at);
+      btn.style.left = `${o.dx}px`;
+      btn.style.top = `${o.dy}px`;
+      small.style.left = `${o.dx}px`;
+      small.style.top = `${o.dy + LABEL_GAP}px`;
     }
   }
 
@@ -340,6 +341,7 @@ export function attachInput({
       x: parseFloat(ring.style.left) || 0,
       y: parseFloat(ring.style.top) || 0,
       k: ringAt ? ringAt.k : 1,
+      layout: ringAt ? ringAt.layout : 'tri',
     }),
     hideRing,
   };
