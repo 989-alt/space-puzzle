@@ -6,6 +6,7 @@ import {
   expectedScreenClues, renderedClue, playOrder, startState, solutionsOf, validOrders,
 } from '../tools/audit-puzzles.mjs';
 import { clueFor } from '../src/core/clues.js';
+import { MIN_ORDERS, MAX_ALTERNATIVES } from '../tools/gen-puzzles.mjs';
 
 const bank = loadBanks();
 
@@ -29,6 +30,22 @@ test('B/C reachable through game mechanics (5 seeds) + at least one drop order',
     }
   }
   assert.deepEqual(fails, []);
+});
+
+// 2차(2026-10-22): 놓는 순서가 하나뿐인 문제(예전 s2-006·s2-036)와 4단계 다른 정답이 많은 문제
+// (예전 s4-005 65개·s4-022 41개·s4-007 27개)를 생성기에서 막는다.
+test(`C every puzzle has at least ${MIN_ORDERS} valid drop orders for some solution`, () => {
+  assert.ok(MIN_ORDERS >= 2);
+  const few = bank.map((p) => [p.id, Math.max(0, ...solutionsOf(p).map((s) => validOrders(s).length))])
+    .filter(([, n]) => n < MIN_ORDERS);
+  assert.deepEqual(few, []);
+});
+
+test(`E level-4 alternatives buildable from pieces are at most ${MAX_ALTERNATIVES}`, () => {
+  assert.ok(MAX_ALTERNATIVES <= 8);
+  const many = bank.filter((p) => p.stage === 4).map(level4Alternatives)
+    .filter((e) => e.alternatives > MAX_ALTERNATIVES).map((e) => [e.id, e.alternatives]);
+  assert.deepEqual(many, []);
 });
 
 test('D clues match 3D target and on-screen convention', () => {

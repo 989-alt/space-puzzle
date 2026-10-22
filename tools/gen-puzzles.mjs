@@ -2,9 +2,11 @@
 // 스펙 4.2 "거꾸로 만들기": 목표 모양을 먼저 만들고 조각으로 쪼갠 뒤, 해답 탐색기로 풀림·해답 수를 센다.
 // 시드 고정이라 같은 코드면 같은 결과가 나온다.
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { key, normalize, orientations } from '../src/core/pieces.js';
 import { footprint, hasOverhang } from '../src/core/clues.js';
 import { solve } from '../src/core/solver.js';
+import { validOrders, level4Alternatives } from './audit-puzzles.mjs';
 
 const SEED = 20261021;
 const PER_STAGE = 40; // 은행 크기(30 이상)
@@ -200,35 +202,75 @@ function puzzleKey(target, pieceIds) {
   return `${best}|${[...pieceIds].sort().join('|')}`;
 }
 
+// 품질 조건(2026-10-22 감사 2차):
+//  - 낙하 순서: 해답(최대 ORDER_SOLUTION_LIMIT개) 중 하나라도 가능한 놓는 순서가 MIN_ORDERS개 이상(순서 하나만 허용하면 학생이 막힘)
+//  - 4단계: 위·앞·옆이 같고 조각으로 쌓을 수 있는 다른 정답이 MAX_ALTERNATIVES개 이하(단서가 모양을 충분히 정함)
+// 감사 도구(tools/audit-puzzles.mjs)와 같은 함수로 센다.
+export const MIN_ORDERS = 2;
+export const MAX_ALTERNATIVES = 8;
+const ORDER_SOLUTION_LIMIT = 50; // 감사 도구 SOLUTION_LIMIT 과 같게
+
+export function maxDropOrders(target, pieces) {
+  const sols = solve(target, pieces, { limit: ORDER_SOLUTION_LIMIT }).solutions;
+  return Math.max(0, ...sols.map((s) => validOrders(s).length));
+}
+
+function qualityOk(p) {
+  if (maxDropOrders(p.target, p.pieces) < MIN_ORDERS) return 'orders';
+  if (p.stage === 4 && level4Alternatives(p).alternatives > MAX_ALTERNATIVES) return 'alternatives';
+  return null;
+}
+
 function generateStage(stage) {
   const rule = STAGES[stage];
   const out = [];
   const seen = new Set();
   const stats = { tries: 0, noTarget: 0, footprint: 0, noSplit: 0, sameShape: 0, dup: 0, stage4: 0, unsolvable: 0 };
-  while (out.length < PER_STAGE && stats.tries < 200000) {
+  // 후보 하나를 만들어 기본 필터를 통과하면 돌려준다(난수 사용 순서는 2026-10-21 판과 같다).
+  const candidate = () => {
     stats.tries++;
     const sizes = pickSizes(rule);
     const N = sizes.reduce((a, b) => a + b, 0);
     const target = makeTarget(N, rule);
-    if (!target || hasOverhang(target)) { stats.noTarget++; continue; }
-    if (!footprintOk(target, rule)) { stats.footprint++; continue; }
-    if (stage === 4 && !stage4Meaningful(target)) { stats.stage4++; continue; }
+    if (!target || hasOverhang(target)) { stats.noTarget++; return null; }
+    if (!footprintOk(target, rule)) { stats.footprint++; return null; }
+    if (stage === 4 && !stage4Meaningful(target)) { stats.stage4++; return null; }
     const split = partition(target, sizes);
-    if (!split) { stats.noSplit++; continue; }
+    if (!split) { stats.noSplit++; return null; }
     const pieces = split.map(canonical);
     const counts = new Map();
     for (const p of pieces) counts.set(p.id, (counts.get(p.id) ?? 0) + 1);
-    if (Math.max(...counts.values()) > MAX_SAME_SHAPE) { stats.sameShape++; continue; }
+    if (Math.max(...counts.values()) > MAX_SAME_SHAPE) { stats.sameShape++; return null; }
     const pk = puzzleKey(target, pieces.map((p) => p.id));
-    if (seen.has(pk)) { stats.dup++; continue; }
+    if (seen.has(pk)) { stats.dup++; return null; }
     const { count } = solve(target, pieces.map((p) => p.cells), { limit: SOLUTION_LIMIT });
-    if (count < 1) { stats.unsolvable++; continue; }
+    if (count < 1) { stats.unsolvable++; return null; }
     seen.add(pk);
-    out.push({ stage, target, pieces: pieces.map((p) => p.cells), solutions: count });
+    return { stage, target, pieces: pieces.map((p) => p.cells), solutions: count };
+  };
+  while (out.length < PER_STAGE && stats.tries < 200000) {
+    const c = candidate();
+    if (c) out.push(c);
   }
   if (out.length < PER_STAGE) throw new Error(`stage ${stage}: only ${out.length} puzzles`);
   // 해답 수 순서가 아니라 단계 안에서 고르게 섞어 저장한다.
   shuffle(out);
+  // 품질 조건에 걸린 문제만 그 자리(같은 번호)에서 조각 수가 같은 새 후보로 바꾼다. 나머지 번호의 문제는 그대로다.
+  const replaced = [];
+  for (let i = 0; i < out.length; i++) {
+    const why = qualityOk(out[i]);
+    if (!why) continue;
+    let c = null;
+    while (!c && stats.tries < 400000) {
+      c = candidate();
+      // 단계 난이도가 그대로이게 조각 수가 같은 후보만 쓴다
+      if (c && (c.pieces.length !== out[i].pieces.length || qualityOk(c))) c = null;
+    }
+    if (!c) throw new Error(`stage ${stage}: no replacement for #${i + 1}`);
+    replaced.push(`#${i + 1}(${why})`);
+    out[i] = c;
+  }
+  stats.replaced = replaced.join(' ');
   return {
     puzzles: out.map((p, i) => ({ id: `s${stage}-${String(i + 1).padStart(3, '0')}`, ...p })),
     stats,
@@ -239,26 +281,30 @@ function toJson(puzzles) {
   return `[\n${puzzles.map((p) => JSON.stringify(p)).join(',\n')}\n]\n`;
 }
 
-const dataDir = new URL('../data/', import.meta.url);
-mkdirSync(dataDir, { recursive: true });
-const t0 = performance.now();
-for (const stage of [1, 2, 3, 4]) {
-  rand = mulberry32(SEED + stage); // 단계마다 독립 시드라 한 단계 규칙을 바꿔도 다른 단계는 그대로다
-  const t = performance.now();
-  const { puzzles, stats } = generateStage(stage);
-  writeFileSync(new URL(`puzzles-s${stage}.json`, dataDir), toJson(puzzles));
-  const sol = puzzles.map((p) => p.solutions);
-  const hist = {};
-  for (const s of sol) {
-    const b = s === 1 ? '1' : s <= 3 ? '2-3' : s <= 10 ? '4-10' : s < SOLUTION_LIMIT ? '11-99' : `${SOLUTION_LIMIT}+`;
-    hist[b] = (hist[b] ?? 0) + 1;
+function main() {
+  const dataDir = new URL('../data/', import.meta.url);
+  mkdirSync(dataDir, { recursive: true });
+  const t0 = performance.now();
+  for (const stage of [1, 2, 3, 4]) {
+    rand = mulberry32(SEED + stage); // 단계마다 독립 시드라 한 단계 규칙을 바꿔도 다른 단계는 그대로다
+    const t = performance.now();
+    const { puzzles, stats } = generateStage(stage);
+    writeFileSync(new URL(`puzzles-s${stage}.json`, dataDir), toJson(puzzles));
+    const sol = puzzles.map((p) => p.solutions);
+    const hist = {};
+    for (const s of sol) {
+      const b = s === 1 ? '1' : s <= 3 ? '2-3' : s <= 10 ? '4-10' : s < SOLUTION_LIMIT ? '11-99' : `${SOLUTION_LIMIT}+`;
+      hist[b] = (hist[b] ?? 0) + 1;
+    }
+    const sizeHist = {};
+    for (const p of puzzles) for (const pc of p.pieces) sizeHist[pc.length] = (sizeHist[pc.length] ?? 0) + 1;
+    console.log(
+      `s${stage}: ${puzzles.length} puzzles in ${((performance.now() - t) / 1000).toFixed(2)}s`,
+      `solutions ${JSON.stringify(hist)} pieceSizes ${JSON.stringify(sizeHist)}`,
+      `rejects ${JSON.stringify(stats)}`,
+    );
   }
-  const sizeHist = {};
-  for (const p of puzzles) for (const pc of p.pieces) sizeHist[pc.length] = (sizeHist[pc.length] ?? 0) + 1;
-  console.log(
-    `s${stage}: ${puzzles.length} puzzles in ${((performance.now() - t) / 1000).toFixed(2)}s`,
-    `solutions ${JSON.stringify(hist)} pieceSizes ${JSON.stringify(sizeHist)}`,
-    `rejects ${JSON.stringify(stats)}`,
-  );
+  console.log(`total ${((performance.now() - t0) / 1000).toFixed(2)}s`);
 }
-console.log(`total ${((performance.now() - t0) / 1000).toFixed(2)}s`);
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
